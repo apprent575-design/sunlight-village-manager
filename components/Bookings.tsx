@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Booking, BookingStatus, PaymentStatus } from '../types';
-import { Plus, Edit2, Trash2, FileText, CheckCircle, Clock, XCircle, MessageCircle, Calendar, ThumbsUp, ThumbsDown, DollarSign } from 'lucide-react';
+import { Plus, Edit2, Trash2, FileText, CheckCircle, Clock, XCircle, MessageCircle, Calendar, ThumbsUp, ThumbsDown, AlertTriangle, Loader2 } from 'lucide-react';
 import { format, addDays, parseISO, isWithinInterval, isValid } from 'date-fns';
 import { generateReceipt } from '../utils/pdfGenerator';
 
@@ -9,6 +9,11 @@ export const Bookings = () => {
   const { t, state, addBooking, updateBooking, deleteBooking, language } = useApp();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [bookingToDelete, setBookingToDelete] = useState<Booking | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  // UI State
+  const [formError, setFormError] = useState<string | null>(null);
 
   // Filters
   const [filterStart, setFilterStart] = useState('');
@@ -44,7 +49,6 @@ export const Bookings = () => {
       const end = addDays(parsedDate, Number(formData.nights));
       
       // Calculate Grand Total (Tenant Pays)
-      // Logic: (BaseRate + VillageFee) * Nights + Housekeeping
       const base = Number(formData.nightly_rate || 0);
       const fee = Number(formData.village_fee || 0);
       const nights = Number(formData.nights || 0);
@@ -62,6 +66,7 @@ export const Bookings = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError(null); // Clear previous errors
     
     // Construct payload
     const bookingPayload = {
@@ -81,14 +86,16 @@ export const Bookings = () => {
       }
       setIsModalOpen(false);
       resetForm();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to save booking:", error);
-      alert("Failed to save booking. Please try again.");
+      // SET THE ERROR MESSAGE TO DISPLAY IN UI
+      setFormError(error.message || "Failed to save booking. Please try again.");
     }
   };
 
   const resetForm = () => {
     setEditingId(null);
+    setFormError(null);
     setFormData({
       tenant_name: '',
       phone: '',
@@ -110,6 +117,7 @@ export const Bookings = () => {
 
   const handleEdit = (booking: Booking) => {
     setEditingId(booking.id);
+    setFormError(null);
     let startDate = format(new Date(), 'yyyy-MM-dd');
     let endDate = format(new Date(), 'yyyy-MM-dd');
 
@@ -130,6 +138,22 @@ export const Bookings = () => {
       end_date: endDate,
     });
     setIsModalOpen(true);
+  };
+
+  const handleDeleteClick = (booking: Booking) => {
+    setBookingToDelete(booking);
+  };
+
+  const confirmDelete = async () => {
+    if (bookingToDelete) {
+        setIsDeleting(true);
+        try {
+            await deleteBooking(bookingToDelete.id);
+        } finally {
+            setIsDeleting(false);
+            setBookingToDelete(null); 
+        }
+    }
   };
 
   const getStatusBadge = (status: BookingStatus) => {
@@ -157,7 +181,7 @@ export const Bookings = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h2 className="text-3xl font-bold text-gray-800 dark:text-white">{t('bookings')}</h2>
         <div className="flex flex-col md:flex-row gap-4 items-end md:items-center w-full md:w-auto">
@@ -242,28 +266,29 @@ export const Bookings = () => {
                 </div>
               )}
 
-              <div className="flex items-center justify-between border-t border-gray-100 dark:border-gray-700 pt-4">
+              {/* CARD FOOTER - Wrapped to prevent overflow */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 dark:border-gray-700 pt-4">
                  <div className="flex items-center gap-2">
                      <a 
                         href={`https://wa.me/20${booking.phone}`} 
                         target="_blank" 
                         rel="noreferrer"
-                        className="flex items-center gap-2 text-green-600 hover:text-green-700 font-bold bg-green-50 hover:bg-green-100 px-3 py-2 rounded-lg transition-colors"
+                        className="flex items-center justify-center gap-2 text-green-600 hover:text-green-700 font-bold bg-green-50 hover:bg-green-100 p-2 rounded-lg transition-colors"
+                        title="WhatsApp"
                      >
                         <MessageCircle size={18} />
-                        <span className="hidden sm:inline">WhatsApp</span>
                      </a>
                      {booking.tenant_rating_good !== undefined && (
                         <span className={`p-2 rounded-lg ${booking.tenant_rating_good ? 'text-green-500 bg-green-50' : 'text-red-500 bg-red-50'}`} title={booking.tenant_rating_good ? t('welcomeAgain') : t('notWelcome')}>
-                            {booking.tenant_rating_good ? <ThumbsUp size={16} /> : <ThumbsDown size={16} />}
+                            {booking.tenant_rating_good ? <ThumbsUp size={18} /> : <ThumbsDown size={18} />}
                         </span>
                      )}
                  </div>
                  
                  <div className="flex gap-2">
-                    <button onClick={() => generateReceipt(booking, unit?.name || '', language, t)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg"><FileText size={18} /></button>
-                    <button onClick={() => handleEdit(booking)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg"><Edit2 size={18} /></button>
-                    <button onClick={() => deleteBooking(booking.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg"><Trash2 size={18} /></button>
+                    <button onClick={() => generateReceipt(booking, unit?.name || '', language, t)} className="p-2 text-blue-500 hover:bg-blue-50 rounded-lg" title="Receipt"><FileText size={18} /></button>
+                    <button onClick={() => handleEdit(booking)} className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg" title="Edit"><Edit2 size={18} /></button>
+                    <button onClick={() => handleDeleteClick(booking)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg" title="Delete"><Trash2 size={18} /></button>
                  </div>
               </div>
             </div>
@@ -271,13 +296,70 @@ export const Bookings = () => {
         })}
       </div>
 
-      {/* Modal */}
+      {/* Delete Confirmation Modal */}
+      {bookingToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="glass bg-white dark:bg-slate-900 w-full max-w-md p-8 rounded-3xl shadow-2xl animate-in fade-in zoom-in duration-200 border border-red-100 dark:border-red-900/30">
+            
+            <div className="flex flex-col items-center text-center">
+                <div className="p-4 bg-red-100 dark:bg-red-900/20 text-red-600 rounded-full mb-6 ring-8 ring-red-50 dark:ring-red-900/10">
+                    {isDeleting ? <Loader2 size={36} className="animate-spin" /> : <AlertTriangle size={36} strokeWidth={2.5} />}
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Delete Booking?</h3>
+                <p className="text-gray-500 dark:text-gray-400 mb-8">
+                    Are you sure you want to remove the booking for <br/> 
+                    <span className="font-bold text-gray-800 dark:text-gray-200">{bookingToDelete.tenant_name}</span>? 
+                    <br/>This action cannot be undone.
+                </p>
+
+                <div className="flex gap-3 w-full">
+                    <button 
+                        type="button"
+                        onClick={() => setBookingToDelete(null)}
+                        disabled={isDeleting}
+                        className="flex-1 p-3.5 rounded-xl border border-gray-200 dark:border-gray-700 font-bold hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors text-gray-700 dark:text-gray-300 disabled:opacity-50"
+                    >
+                        {t('cancel')}
+                    </button>
+                    <button 
+                        type="button"
+                        onClick={confirmDelete}
+                        disabled={isDeleting}
+                        className="flex-1 p-3.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold shadow-lg shadow-red-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                        {isDeleting ? 'Deleting...' : (
+                            <>
+                                <Trash2 size={18} />
+                                Delete
+                            </>
+                        )}
+                    </button>
+                </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="glass w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl p-8 shadow-2xl animate-in fade-in zoom-in duration-200 bg-white dark:bg-slate-900">
-            <h3 className="text-3xl font-bold mb-8 text-gray-800 dark:text-white border-b border-gray-100 dark:border-gray-800 pb-4">
+            <h3 className="text-3xl font-bold mb-4 text-gray-800 dark:text-white border-b border-gray-100 dark:border-gray-800 pb-4">
               {editingId ? t('editBooking') : t('addBooking')}
             </h3>
+
+            {/* ERROR DISPLAY BANNER */}
+            {formError && (
+                <div className="mb-6 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-xl p-4 flex items-center gap-3 animate-in slide-in-from-top-2">
+                    <div className="p-2 bg-red-100 dark:bg-red-800 rounded-full text-red-600 dark:text-red-200">
+                        <AlertTriangle size={20} />
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-red-800 dark:text-red-200">Action Failed</h4>
+                        <p className="text-sm text-red-600 dark:text-red-300">{formError}</p>
+                    </div>
+                </div>
+            )}
             
             <form onSubmit={handleSubmit} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -491,7 +573,7 @@ export const Bookings = () => {
               <div className="flex gap-4 pt-4">
                 <button 
                   type="button" 
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => { setIsModalOpen(false); setFormError(null); }}
                   className="flex-1 p-4 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 font-bold transition-colors"
                 >
                   {t('cancel')}

@@ -21,7 +21,7 @@ export const Reports = () => {
              <p className="text-gray-500 text-sm">Download net profit and revenue breakdown.</p>
           </div>
           <button 
-            onClick={() => generateFinancialReport(state.bookings, state.expenses, language, t)}
+            onClick={() => generateFinancialReport(state.units, state.bookings, state.expenses, language, t)}
             className="flex items-center justify-center gap-2 w-full p-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors"
           >
             <Download size={18} /> Download PDF

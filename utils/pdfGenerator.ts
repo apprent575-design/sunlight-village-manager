@@ -1,349 +1,412 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { Booking, Unit, Expense, Language } from '../types';
+import { Booking, Unit, Expense, Language, BookingStatus } from '../types';
 import { format } from 'date-fns';
 
-// Helper: Generates a PDF from a hidden HTML element
 const generatePdfFromHtml = async (htmlContent: string, fileName: string, isRTL: boolean) => {
-  // 1. Create a container for the HTML
   const container = document.createElement('div');
-  container.style.position = 'absolute';
-  container.style.top = '-9999px';
-  container.style.left = isRTL ? 'auto' : '-9999px';
-  container.style.right = isRTL ? '-9999px' : 'auto';
-  container.style.width = '794px'; // A4 width at 96 DPI (approx)
-  container.style.minHeight = '1123px'; // A4 height
+  container.style.position = 'fixed'; 
+  container.style.top = '-10000px';
+  container.style.left = isRTL ? '0' : '-10000px'; 
+  container.style.width = '1200px'; 
+  container.style.minHeight = '1600px';
   container.style.backgroundColor = '#ffffff';
   container.style.color = '#000000';
   container.style.fontFamily = "'Cairo', sans-serif";
   container.style.direction = isRTL ? 'rtl' : 'ltr';
   container.innerHTML = htmlContent;
-
   document.body.appendChild(container);
 
   try {
-    // 2. Wait longer for DOM/Tailwind to settle (2 seconds)
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // 3. Capture with html2canvas
+    await document.fonts.ready;
+    await new Promise(resolve => setTimeout(resolve, 800));
     const canvas = await html2canvas(container, {
-      scale: 2, // Higher quality
+      scale: 2, 
       useCORS: true,
-      logging: false,
-      backgroundColor: '#ffffff'
+      onclone: (clonedDoc) => {
+        const style = clonedDoc.createElement('style');
+        style.innerHTML = `* { font-family: 'Cairo', sans-serif !important; letter-spacing: 0px !important; }`;
+        clonedDoc.head.appendChild(style);
+        const div = clonedDoc.body.querySelector('div');
+        if(div) div.style.direction = isRTL ? 'rtl' : 'ltr';
+      }
     });
-
-    // 4. Generate PDF
     const imgData = canvas.toDataURL('image/png');
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = pdf.internal.pageSize.getHeight();
-    
-    const imgWidth = pdfWidth;
     const imgHeight = (canvas.height * pdfWidth) / canvas.width;
-
-    pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
-    
+    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight);
     pdf.save(fileName);
-
   } catch (error) {
     console.error("PDF Generation failed:", error);
-    alert("Could not generate PDF. Please try again.");
+    alert("Could not generate PDF.");
   } finally {
-    // 5. Cleanup
-    if (document.body.contains(container)) {
-      document.body.removeChild(container);
-    }
+    if (document.body.contains(container)) document.body.removeChild(container);
   }
 };
 
 export const generateReceipt = async (booking: Booking, unitName: string, lang: Language, t: any) => {
   const isRTL = lang === 'ar';
-  const nightlyBase = booking.nightly_rate || 0;
-  const villageFee = booking.village_fee || 0;
-  const dailyTotal = nightlyBase + villageFee;
   
-  const html = `
-    <div class="p-12 font-sans" dir="${isRTL ? 'rtl' : 'ltr'}">
-      <div class="text-center mb-10 border-b-2 border-primary-100 pb-8">
-        <h1 class="text-4xl font-extrabold text-primary-600 mb-2">Sunlight Village</h1>
-        <h2 class="text-2xl text-gray-600 font-semibold">${isRTL ? "فاتورة حجز" : "Booking Receipt"}</h2>
-        <p class="text-sm text-gray-400 mt-2">Generated: ${format(new Date(), 'yyyy-MM-dd HH:mm')}</p>
-      </div>
+  // Calculations
+  const baseTotal = booking.nightly_rate * booking.nights;
+  const villageFeesTotal = (booking.village_fee || 0) * booking.nights;
+  const housekeeping = booking.housekeeping_enabled ? (booking.housekeeping_price || 0) : 0;
+  const subtotal = baseTotal + villageFeesTotal + housekeeping; // Should equal total_rental_price
+  const deposit = booking.deposit_enabled ? (booking.deposit_amount || 0) : 0;
 
-      <div class="mb-10">
-        <div class="grid grid-cols-2 gap-6 text-sm mb-4">
-           <div class="p-6 bg-gray-50 rounded-2xl border border-gray-100">
-              <span class="block text-gray-500 text-xs uppercase tracking-wider mb-2">${t('tenant')}</span>
-              <span class="block text-xl font-bold text-gray-900 mb-1">${booking.tenant_name}</span>
-              <span class="block text-gray-600 text-lg" style="direction: ltr">+20 ${booking.phone}</span>
+  const html = `
+    <div style="font-family: 'Cairo', sans-serif; padding: 50px; color: #1f2937; max-width: 900px; margin: 0 auto; background: white;">
+      
+      <!-- Header -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #0ea5e9; padding-bottom: 25px; margin-bottom: 35px;">
+        <div style="display: flex; flex-direction: column;">
+           <h1 style="color: #0284c7; font-size: 36px; margin: 0; font-weight: 800; letter-spacing: -0.5px;">Sunlight Village</h1>
+           <p style="color: #64748b; font-size: 14px; margin: 5px 0; font-weight: 500;">Premium Property Management</p>
+        </div>
+        <div style="text-align: ${isRTL ? 'left' : 'right'};">
+           <div style="background: #f0f9ff; color: #0369a1; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 20px; display: inline-block; margin-bottom: 10px;">
+             ${isRTL ? 'إيصال حجز' : 'RECEIPT / INVOICE'}
            </div>
-           <div class="p-6 bg-gray-50 rounded-2xl border border-gray-100">
-              <span class="block text-gray-500 text-xs uppercase tracking-wider mb-2">${t('unit')}</span>
-              <span class="block text-xl font-bold text-gray-900">${unitName}</span>
-           </div>
+           <p style="color: #94a3b8; font-size: 13px; margin: 2px 0;"><strong>ID:</strong> #${booking.id.slice(0, 8).toUpperCase()}</p>
+           <p style="color: #94a3b8; font-size: 13px; margin: 2px 0;"><strong>Date:</strong> ${format(new Date(), 'yyyy-MM-dd')}</p>
         </div>
       </div>
 
-      <div class="bg-white border-2 border-gray-100 rounded-2xl overflow-hidden mb-8">
-        <table class="w-full text-left">
-          <thead class="bg-gray-50 text-gray-700">
-            <tr>
-              <th class="p-5 text-sm font-bold uppercase tracking-wider ${isRTL ? 'text-right' : 'text-left'}">${t('details')}</th>
-              <th class="p-5 text-sm font-bold uppercase tracking-wider ${isRTL ? 'text-left' : 'text-right'}">${t('amount')}</th>
-            </tr>
-          </thead>
-          <tbody class="divide-y divide-gray-100">
-            <tr>
-              <td class="p-5 ${isRTL ? 'text-right' : 'text-left'}">
-                <span class="font-bold block text-gray-800 text-lg mb-1">${t('dates')}</span>
-                <span class="text-sm text-gray-500">${format(new Date(booking.start_date), 'yyyy-MM-dd')} &rarr; ${format(new Date(booking.end_date), 'yyyy-MM-dd')}</span>
-              </td>
-              <td class="p-5 font-mono font-medium text-lg text-gray-700 ${isRTL ? 'text-left' : 'text-right'}">
-                ${booking.nights} ${t('nights')}
-              </td>
-            </tr>
-            <tr>
-              <td class="p-5 ${isRTL ? 'text-right' : 'text-left'}">
-                 <span class="block font-medium text-gray-600">${t('nightlyRate')} (Base)</span>
-              </td>
-              <td class="p-5 font-mono text-gray-600 ${isRTL ? 'text-left' : 'text-right'}">
-                 ${nightlyBase} ${t('currency')}
-              </td>
-            </tr>
-            <tr>
-              <td class="p-5 ${isRTL ? 'text-right' : 'text-left'}">
-                 <span class="block font-medium text-gray-600">${t('villageFee')} (Daily)</span>
-              </td>
-              <td class="p-5 font-mono text-gray-600 ${isRTL ? 'text-left' : 'text-right'}">
-                 ${villageFee} ${t('currency')}
-              </td>
-            </tr>
-             <tr class="bg-blue-50/30">
-              <td class="p-5 ${isRTL ? 'text-right' : 'text-left'} font-bold text-blue-800">
-                 ${t('dailyTotal')}
-              </td>
-              <td class="p-5 font-mono font-bold text-blue-800 ${isRTL ? 'text-left' : 'text-right'}">
-                 ${dailyTotal} ${t('currency')}
-              </td>
-            </tr>
+      <!-- Info Grid -->
+      <div style="display: flex; gap: 40px; margin-bottom: 40px;">
+        <div style="flex: 1; background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0;">
+            <h3 style="font-size: 14px; text-transform: uppercase; color: #64748b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin: 0 0 15px 0; font-weight: 700;">
+                ${isRTL ? 'بيانات المستأجر' : 'Tenant Information'}
+            </h3>
+            <div style="font-size: 15px;">
+                <p style="margin: 8px 0; display:flex; justify-content:space-between;">
+                    <span style="color:#64748b;">Name:</span> 
+                    <span style="font-weight:bold;">${booking.tenant_name}</span>
+                </p>
+                <p style="margin: 8px 0; display:flex; justify-content:space-between;">
+                    <span style="color:#64748b;">Phone:</span> 
+                    <span style="font-weight:bold;">${booking.phone}</span>
+                </p>
+            </div>
+        </div>
+        <div style="flex: 1; background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0;">
+            <h3 style="font-size: 14px; text-transform: uppercase; color: #64748b; border-bottom: 2px solid #e2e8f0; padding-bottom: 10px; margin: 0 0 15px 0; font-weight: 700;">
+                ${isRTL ? 'تفاصيل الحجز' : 'Booking Details'}
+            </h3>
+            <div style="font-size: 15px;">
+                <p style="margin: 8px 0; display:flex; justify-content:space-between;">
+                    <span style="color:#64748b;">Unit:</span> 
+                    <span style="font-weight:bold; color: #0369a1;">${unitName}</span>
+                </p>
+                <p style="margin: 8px 0; display:flex; justify-content:space-between;">
+                    <span style="color:#64748b;">Duration:</span> 
+                    <span style="font-weight:bold;">${booking.nights} Nights</span>
+                </p>
+                <p style="margin: 8px 0; display:flex; justify-content:space-between;">
+                    <span style="color:#64748b;">Check-in:</span> 
+                    <span>${format(new Date(booking.start_date), 'yyyy-MM-dd')}</span>
+                </p>
+                <p style="margin: 8px 0; display:flex; justify-content:space-between;">
+                    <span style="color:#64748b;">Check-out:</span> 
+                    <span>${format(new Date(booking.end_date), 'yyyy-MM-dd')}</span>
+                </p>
+            </div>
+        </div>
+      </div>
 
-            ${booking.housekeeping_enabled ? `
+      <!-- Financial Table -->
+      <table style="width: 100%; border-collapse: separate; border-spacing: 0; margin-bottom: 30px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+        <thead style="background-color: #f1f5f9;">
             <tr>
-              <td class="p-5 ${isRTL ? 'text-right' : 'text-left'} font-bold text-gray-700">${t('housekeeping')}</td>
-              <td class="p-5 font-mono font-medium text-gray-700 ${isRTL ? 'text-left' : 'text-right'}">${booking.housekeeping_price} ${t('currency')}</td>
+                <th style="text-align: ${isRTL ? 'right' : 'left'}; padding: 16px; color: #475569; font-weight: 700; text-transform: uppercase; font-size: 12px;">Item / Description</th>
+                <th style="text-align: center; padding: 16px; color: #475569; font-weight: 700; text-transform: uppercase; font-size: 12px;">Rate (Daily)</th>
+                <th style="text-align: center; padding: 16px; color: #475569; font-weight: 700; text-transform: uppercase; font-size: 12px;">Qty</th>
+                <th style="text-align: right; padding: 16px; color: #475569; font-weight: 700; text-transform: uppercase; font-size: 12px;">Total</th>
             </tr>
+        </thead>
+        <tbody style="font-size: 14px;">
+            <tr>
+                <td style="padding: 16px; border-bottom: 1px solid #e2e8f0; border-right: 1px solid #f1f5f9;">
+                    <strong>Accommodation (Base Rent)</strong>
+                    <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Unit rental without fees</div>
+                </td>
+                <td style="padding: 16px; border-bottom: 1px solid #e2e8f0; text-align: center; border-right: 1px solid #f1f5f9;">${booking.nightly_rate.toLocaleString()}</td>
+                <td style="padding: 16px; border-bottom: 1px solid #e2e8f0; text-align: center; border-right: 1px solid #f1f5f9;">${booking.nights}</td>
+                <td style="padding: 16px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 600;">${baseTotal.toLocaleString()}</td>
+            </tr>
+            ${booking.village_fee > 0 ? `
+            <tr>
+                <td style="padding: 16px; border-bottom: 1px solid #e2e8f0; border-right: 1px solid #f1f5f9;">
+                    <strong>Village Fees</strong>
+                    <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Daily mandatory gate/village fees</div>
+                </td>
+                <td style="padding: 16px; border-bottom: 1px solid #e2e8f0; text-align: center; border-right: 1px solid #f1f5f9;">${booking.village_fee.toLocaleString()}</td>
+                <td style="padding: 16px; border-bottom: 1px solid #e2e8f0; text-align: center; border-right: 1px solid #f1f5f9;">${booking.nights}</td>
+                <td style="padding: 16px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 600;">${villageFeesTotal.toLocaleString()}</td>
+            </tr>` : ''}
+            ${housekeeping > 0 ? `
+            <tr>
+                <td style="padding: 16px; border-bottom: 1px solid #e2e8f0; border-right: 1px solid #f1f5f9;">
+                    <strong>Housekeeping</strong>
+                    <div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">Cleaning service fee</div>
+                </td>
+                <td style="padding: 16px; border-bottom: 1px solid #e2e8f0; text-align: center; border-right: 1px solid #f1f5f9;">-</td>
+                <td style="padding: 16px; border-bottom: 1px solid #e2e8f0; text-align: center; border-right: 1px solid #f1f5f9;">1</td>
+                <td style="padding: 16px; border-bottom: 1px solid #e2e8f0; text-align: right; font-weight: 600;">${housekeeping.toLocaleString()}</td>
+            </tr>` : ''}
+        </tbody>
+        <tfoot style="background-color: #f8fafc;">
+            <tr>
+                <td colspan="3" style="padding: 16px; text-align: ${isRTL ? 'left' : 'right'}; font-weight: 800; color: #0f172a; text-transform: uppercase; font-size: 14px;">Total Rental Price</td>
+                <td style="padding: 16px; text-align: right; font-weight: 800; font-size: 18px; color: #0f172a;">${booking.total_rental_price.toLocaleString()} EGP</td>
+            </tr>
+        </tfoot>
+      </table>
+
+      ${deposit > 0 ? `
+      <div style="background-color: #fff7ed; border: 1px solid #fdba74; padding: 20px; border-radius: 12px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+             <div style="background:#fed7aa; color:#c2410c; width:32px; height:32px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:bold;">$</div>
+             <div>
+                <span style="font-weight: 800; color: #c2410c; font-size: 15px;">Security Deposit (Separate)</span>
+                <span style="font-size: 12px; color: #9a3412; display: block;">Refundable upon check-out inspection</span>
+             </div>
+          </div>
+          <span style="font-weight: 800; font-size: 18px; color: #c2410c;">${deposit.toLocaleString()} EGP</span>
+      </div>` : ''}
+
+      <!-- Footer Status -->
+      <div style="display: flex; gap: 20px; justify-content: space-between; align-items: flex-end; margin-top: 40px; border-top: 1px solid #e2e8f0; padding-top: 20px;">
+          
+          <div style="flex: 1;">
+            ${booking.notes ? `
+                <h4 style="margin: 0 0 8px 0; font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px;">Notes</h4>
+                <p style="margin: 0; font-size: 13px; color: #334155; font-style: italic; background: #f1f5f9; padding: 10px; border-radius: 8px;">${booking.notes}</p>
             ` : ''}
-          </tbody>
-          <tfoot class="bg-gray-900 text-white">
-            <tr>
-              <td class="p-6 text-xl font-bold ${isRTL ? 'text-right' : 'text-left'}">${t('grandTotal')}</td>
-              <td class="p-6 text-2xl font-bold ${isRTL ? 'text-left' : 'text-right'}">${booking.total_rental_price} ${t('currency')}</td>
-            </tr>
-          </tfoot>
-        </table>
+          </div>
+
+          <div style="display: flex; gap: 15px;">
+              <div style="text-align: center;">
+                 <div style="font-size: 11px; color: #64748b; margin-bottom: 4px; text-transform: uppercase;">Booking Status</div>
+                 <div style="padding: 6px 16px; border-radius: 20px; background: ${booking.status === 'Confirmed' ? '#dcfce7' : '#fef9c3'}; color: ${booking.status === 'Confirmed' ? '#166534' : '#854d0e'}; font-weight: bold; font-size: 13px;">
+                    ${booking.status}
+                 </div>
+              </div>
+              <div style="text-align: center;">
+                 <div style="font-size: 11px; color: #64748b; margin-bottom: 4px; text-transform: uppercase;">Payment</div>
+                 <div style="padding: 6px 16px; border-radius: 20px; background: ${booking.payment_status === 'Paid' ? '#dcfce7' : '#fee2e2'}; color: ${booking.payment_status === 'Paid' ? '#166534' : '#991b1b'}; font-weight: bold; font-size: 13px;">
+                    ${booking.payment_status}
+                 </div>
+              </div>
+          </div>
       </div>
       
-      ${booking.deposit_enabled ? `
-        <div class="mb-8 p-4 rounded-xl bg-yellow-50 border border-yellow-200 text-yellow-800 flex justify-between items-center">
-            <div>
-                <span class="font-bold block">${t('deposit')}</span>
-                <span class="text-xs opacity-75">(Refundable Hold)</span>
-            </div>
-            <span class="font-mono font-bold text-xl">${booking.deposit_amount} ${t('currency')}</span>
-        </div>
-        ` : ''}
-
-      <div class="mt-16 text-center border-t border-gray-100 pt-8">
-        <p class="text-gray-400 text-sm mb-2">Thank you for choosing Sunlight Village</p>
-        <div class="inline-block px-6 py-2 rounded-full bg-green-100 text-green-700 text-sm font-bold uppercase tracking-widest">
-           ${booking.status}
-        </div>
+      <div style="margin-top: 40px; text-align: center; font-size: 12px; color: #cbd5e1;">
+        Thank you for choosing Sunlight Village.
       </div>
-    </div>
-  `;
 
-  await generatePdfFromHtml(html, `Receipt_${booking.tenant_name.replace(/\s+/g, '_')}_${booking.id.substring(0,4)}.pdf`, isRTL);
+    </div>`;
+
+  await generatePdfFromHtml(html, `Receipt_${booking.tenant_name}.pdf`, isRTL);
 };
 
 export const generateExpenseReport = async (expenses: Expense[], units: Unit[], lang: Language, t: any) => {
-  const isRTL = lang === 'ar';
-  
-  let rowsHtml = '';
-  let grandTotal = 0;
-
-  for (const unit of units) {
-    const unitExpenses = expenses.filter(e => e.unit_id === unit.id);
-    if (unitExpenses.length === 0) continue;
-
-    const unitTotal = unitExpenses.reduce((sum, e) => sum + e.amount, 0);
-    grandTotal += unitTotal;
-
-    rowsHtml += `
-      <tr class="bg-gray-100">
-        <td colspan="3" class="p-4 font-bold text-gray-800 ${isRTL ? 'text-right' : 'text-left'}">${t('unit')}: ${unit.name}</td>
-      </tr>
-    `;
-
-    unitExpenses.forEach(e => {
-      rowsHtml += `
-        <tr class="border-b border-gray-100">
-          <td class="p-4 text-sm text-gray-600 ${isRTL ? 'text-right' : 'text-left'}">${format(new Date(e.date), 'yyyy-MM-dd')}</td>
-          <td class="p-4 text-sm font-medium text-gray-800 ${isRTL ? 'text-right' : 'text-left'}">
-            ${e.title}
-            <span class="text-xs text-gray-400 block mt-1">${e.category}</span>
-          </td>
-          <td class="p-4 text-sm font-mono text-red-600 font-bold ${isRTL ? 'text-left' : 'text-right'}">${e.amount} ${t('currency')}</td>
-        </tr>
-      `;
-    });
-
-    rowsHtml += `
-      <tr>
-        <td colspan="2" class="p-4 text-sm font-bold text-gray-500 uppercase tracking-wider ${isRTL ? 'text-left' : 'text-right'}">${t('subtotal')}</td>
-        <td class="p-4 text-sm font-bold text-gray-900 ${isRTL ? 'text-left' : 'text-right'}">${unitTotal} ${t('currency')}</td>
-      </tr>
-    `;
-  }
-
-  const html = `
-    <div class="p-12 font-sans" dir="${isRTL ? 'rtl' : 'ltr'}">
-      <div class="flex justify-between items-center mb-10 border-b-2 border-gray-200 pb-8">
-        <div>
-          <h1 class="text-3xl font-extrabold text-gray-900">Sunlight Village</h1>
-          <h2 class="text-xl text-gray-500 mt-1">${isRTL ? "تقرير المصروفات" : "Expense Report"}</h2>
-        </div>
-        <div class="text-right">
-          <p class="text-sm text-gray-400 font-medium">${format(new Date(), 'yyyy-MM-dd')}</p>
-        </div>
-      </div>
-
-      <div class="bg-white rounded-xl overflow-hidden mb-8 border border-gray-200">
-        <table class="w-full">
-          <thead class="bg-gray-800 text-white">
-            <tr>
-              <th class="p-4 text-xs uppercase tracking-wider font-bold ${isRTL ? 'text-right' : 'text-left'}">${t('date')}</th>
-              <th class="p-4 text-xs uppercase tracking-wider font-bold ${isRTL ? 'text-right' : 'text-left'}">${t('details')}</th>
-              <th class="p-4 text-xs uppercase tracking-wider font-bold ${isRTL ? 'text-left' : 'text-right'}">${t('amount')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${rowsHtml}
-          </tbody>
-          <tfoot class="bg-gray-50 border-t-2 border-gray-200">
-             <tr>
-               <td colspan="2" class="p-6 text-xl font-bold text-gray-800 ${isRTL ? 'text-left' : 'text-right'}">${t('total')}</td>
-               <td class="p-6 text-xl font-bold text-red-600 ${isRTL ? 'text-left' : 'text-right'}">${grandTotal} ${t('currency')}</td>
-             </tr>
-          </tfoot>
-        </table>
-      </div>
-    </div>
-  `;
-
-  await generatePdfFromHtml(html, `Expense_Report_${format(new Date(), 'yyyyMMdd')}.pdf`, isRTL);
+    await generateFinancialReport(units, [], expenses, lang, t); 
 };
 
-export const generateFinancialReport = async (bookings: Booking[], expenses: Expense[], lang: Language, t: any) => {
-    const isRTL = lang === 'ar';
-    
-    // Calculate totals
-    const totalRentalRevenue = bookings
-      .filter(b => b.status === 'Confirmed')
-      .reduce((sum, b) => sum + (b.nightly_rate * b.nights), 0);
-    const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
-    const netProfit = totalRentalRevenue - totalExpenses;
-  
-    const html = `
-      <div class="p-12 font-sans" dir="${isRTL ? 'rtl' : 'ltr'}">
-        <div class="text-center mb-12 border-b-2 border-primary-100 pb-8">
-          <h1 class="text-4xl font-extrabold text-primary-600 mb-2">Sunlight Village</h1>
-          <h2 class="text-2xl text-gray-600 font-semibold">${isRTL ? "الملخص المالي" : "Financial Summary"}</h2>
-          <p class="text-sm text-gray-400 mt-2">Generated: ${format(new Date(), 'yyyy-MM-dd')}</p>
-        </div>
-  
-        <div class="grid grid-cols-2 gap-8 mb-12">
-            <div class="p-8 bg-green-50 rounded-2xl border border-green-100 text-center">
-                <h3 className="text-gray-500 font-bold uppercase tracking-wider text-sm mb-2">Total Rental Revenue</h3>
-                <p className="text-4xl font-bold text-green-700">${totalRentalRevenue.toLocaleString()} ${t('currency')}</p>
-                <p className="text-xs text-green-600 mt-2">Based on Confirmed bookings only (Base Rates)</p>
-            </div>
-            <div class="p-8 bg-red-50 rounded-2xl border border-red-100 text-center">
-                <h3 className="text-gray-500 font-bold uppercase tracking-wider text-sm mb-2">Total Expenses</h3>
-                <p className="text-4xl font-bold text-red-700">${totalExpenses.toLocaleString()} ${t('currency')}</p>
-            </div>
-        </div>
-  
-        <div class="p-10 bg-gray-900 rounded-3xl text-center text-white shadow-xl">
-             <h3 className="text-gray-400 font-bold uppercase tracking-wider text-sm mb-4">Net Profit</h3>
-             <p className="text-6xl font-bold text-white">${netProfit.toLocaleString()} ${t('currency')}</p>
-        </div>
-      </div>
-    `;
-  
-    await generatePdfFromHtml(html, `Financial_Summary_${format(new Date(), 'yyyyMMdd')}.pdf`, isRTL);
-};
-
+// --- NEW DETAILED OCCUPANCY REPORT ---
 export const generateOccupancyReport = async (units: Unit[], bookings: Booking[], lang: Language, t: any) => {
     const isRTL = lang === 'ar';
-    
-    let rowsHtml = '';
+    let contentHtml = '';
     
     units.forEach(unit => {
-        const unitBookings = bookings.filter(b => b.unit_id === unit.id).sort((a,b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
-        const totalNights = unitBookings.reduce((sum, b) => sum + b.nights, 0);
+        const unitBookings = bookings
+            .filter(b => b.unit_id === unit.id)
+            .sort((a,b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
 
-        rowsHtml += `
-            <tr class="bg-gray-100">
-               <td colspan="4" class="p-4 font-bold text-gray-800 ${isRTL ? 'text-right' : 'text-left'}">
-                  ${unit.name} <span class="text-xs font-normal text-gray-500">(${unit.type})</span> - <span class="text-blue-600">${totalNights} Nights Booked</span>
-               </td>
+        if (unitBookings.length === 0) return; 
+
+        let unitRows = '';
+        let totalNights = 0;
+        let totalBase = 0;
+        let totalFees = 0;
+        let totalHousekeeping = 0;
+        let totalGrand = 0;
+
+        unitBookings.forEach(b => {
+             const statusColor = b.status === BookingStatus.CONFIRMED ? '#166534' : (b.status === BookingStatus.CANCELLED ? '#991b1b' : '#854d0e');
+             
+             // Calculate Breakdown
+             const baseRent = b.nightly_rate * b.nights;
+             const houseKeeping = b.housekeeping_enabled ? (b.housekeeping_price || 0) : 0;
+             // Village Fees is implied from remaining amount, or calculated explicitly
+             // Total = Base + Housekeeping + VillageFees. So VillageFees = Total - Base - Housekeeping
+             const fees = b.total_rental_price - baseRent - houseKeeping; 
+             
+             if (b.status !== BookingStatus.CANCELLED) {
+                 totalNights += b.nights;
+                 totalBase += baseRent;
+                 totalFees += fees;
+                 totalHousekeeping += houseKeeping;
+                 totalGrand += b.total_rental_price;
+             }
+
+             unitRows += `
+                <tr style="border-bottom: 1px solid #e5e7eb;">
+                   <td style="padding: 10px; font-weight: bold;">${b.tenant_name}</td>
+                   <td style="padding: 10px;">${b.phone}</td>
+                   <td style="padding: 10px; font-size: 12px;">${format(new Date(b.start_date), 'yyyy-MM-dd')} -> ${format(new Date(b.end_date), 'yyyy-MM-dd')}</td>
+                   <td style="padding: 10px; text-align: center;">${b.nights}</td>
+                   
+                   <td style="padding: 10px; text-align: right; color: #0369a1; font-family: monospace;">
+                     ${baseRent.toLocaleString()}
+                   </td>
+                   <td style="padding: 10px; text-align: right; color: #d97706; font-size: 11px;">
+                     ${houseKeeping > 0 ? houseKeeping.toLocaleString() : '-'}
+                   </td>
+                   <td style="padding: 10px; text-align: right; color: #64748b; font-size: 11px;">
+                     ${fees > 0 ? '+' : ''}${fees.toLocaleString()}
+                   </td>
+                   <td style="padding: 10px; text-align: right; font-weight: bold;">
+                     ${b.total_rental_price.toLocaleString()}
+                   </td>
+
+                   <td style="padding: 10px; text-align: right; color: ${statusColor}; font-weight: bold; font-size: 11px;">${b.status}</td>
+                </tr>`;
+        });
+
+        // Add Summary Row
+        unitRows += `
+            <tr style="background-color: #f3f4f6; font-weight: bold; border-top: 2px solid #d1d5db;">
+                <td colspan="3" style="padding: 10px; text-align: ${isRTL ? 'left' : 'right'}; color: #4b5563;">
+                    ${isRTL ? 'إجمالي الوحدة (المؤكدة)' : 'Unit Total (Confirmed/Pending)'}
+                </td>
+                <td style="padding: 10px; text-align: center;">${totalNights}</td>
+                <td style="padding: 10px; text-align: right;">${totalBase.toLocaleString()}</td>
+                <td style="padding: 10px; text-align: right; color: #d97706;">${totalHousekeeping.toLocaleString()}</td>
+                <td style="padding: 10px; text-align: right;">${totalFees.toLocaleString()}</td>
+                <td style="padding: 10px; text-align: right;">${totalGrand.toLocaleString()}</td>
+                <td></td>
             </tr>
         `;
 
-        if (unitBookings.length === 0) {
-             rowsHtml += `<tr><td colspan="4" class="p-4 text-center text-gray-400 text-sm">No history</td></tr>`;
-        }
-
-        unitBookings.forEach(b => {
-             rowsHtml += `
-                <tr class="border-b border-gray-100">
-                   <td class="p-4 text-sm text-gray-700 ${isRTL ? 'text-right' : 'text-left'}">${b.tenant_name}</td>
-                   <td class="p-4 text-sm text-gray-600 ${isRTL ? 'text-right' : 'text-left'}">${format(new Date(b.start_date), 'yyyy-MM-dd')} &rarr; ${format(new Date(b.end_date), 'yyyy-MM-dd')}</td>
-                   <td class="p-4 text-sm font-mono text-gray-600 ${isRTL ? 'text-right' : 'text-left'}">${b.nights} Nights</td>
-                   <td class="p-4 text-xs font-bold uppercase ${isRTL ? 'text-left' : 'text-right'}">
-                      <span class="${b.status === 'Confirmed' ? 'text-green-600' : 'text-yellow-600'}">${b.status}</span>
-                   </td>
-                </tr>
-             `;
-        });
+        contentHtml += `
+            <div style="margin-bottom: 40px; page-break-inside: avoid;">
+                <h3 style="background:#e0f2fe; padding:12px; margin:0; border:1px solid #bae6fd; display:flex; justify-content:space-between; color: #0369a1; border-radius: 8px 8px 0 0;">
+                    <span style="font-weight: bold; font-size: 16px;">${unit.name}</span>
+                    <span style="font-size: 12px; font-weight: normal; color: #0284c7;">${unitBookings.length} Bookings</span>
+                </h3>
+                <table style="width: 100%; border-collapse: collapse; font-size: 12px; border: 1px solid #e5e7eb; border-top:none;">
+                    <thead style="background:#f9fafb; color: #374151;"><tr>
+                        <th style="padding:10px; text-align:${isRTL?'right':'left'}">Tenant</th>
+                        <th style="padding:10px; text-align:${isRTL?'right':'left'}">Phone</th>
+                        <th style="padding:10px; text-align:${isRTL?'right':'left'}">Dates</th>
+                        <th style="padding:10px; text-align:center">Nights</th>
+                        <th style="padding:10px; text-align:right">Base Rent</th>
+                        <th style="padding:10px; text-align:right">Housekeeping</th>
+                        <th style="padding:10px; text-align:right">Fees</th>
+                        <th style="padding:10px; text-align:right">Total</th>
+                        <th style="padding:10px; text-align:right">Status</th>
+                    </tr></thead>
+                    <tbody>${unitRows}</tbody>
+                </table>
+            </div>`;
     });
 
     const html = `
-      <div class="p-12 font-sans" dir="${isRTL ? 'rtl' : 'ltr'}">
-        <div class="text-center mb-10 border-b-2 border-primary-100 pb-8">
-          <h1 class="text-3xl font-extrabold text-primary-600 mb-2">Sunlight Village</h1>
-          <h2 class="text-2xl text-gray-600 font-semibold">${isRTL ? "تقرير الإشغال" : "Occupancy Report"}</h2>
-          <p class="text-sm text-gray-400 mt-2">Generated: ${format(new Date(), 'yyyy-MM-dd')}</p>
+      <div style="padding: 40px; font-family: 'Cairo', sans-serif; color: #111827;">
+        <h1 style="text-align:center; color:#0284c7; margin-bottom:10px; font-size: 28px; font-weight: 800;">Detailed Occupancy Report</h1>
+        <p style="text-align:center; color:#6b7280; font-size: 12px; margin-bottom: 40px;">Breakdown of Base Rent, Housekeeping, and Fees</p>
+        ${contentHtml || '<p style="text-align:center; padding: 20px; color: #666;">No bookings found.</p>'}
+      </div>`;
+    await generatePdfFromHtml(html, `Occupancy_Detailed.pdf`, isRTL);
+};
+
+// --- NEW DETAILED FINANCIAL REPORT (PROFIT) ---
+export const generateFinancialReport = async (units: Unit[], bookings: Booking[], expenses: Expense[], lang: Language, t: any) => {
+    // ... (Keep existing implementation)
+    const isRTL = lang === 'ar';
+    let rowsHtml = '';
+    let grandRev = 0, grandExp = 0, grandNet = 0;
+
+    units.forEach(unit => {
+        const unitBookings = bookings.filter(b => b.unit_id === unit.id && b.status === BookingStatus.CONFIRMED);
+        const unitExpenses = expenses.filter(e => e.unit_id === unit.id);
+
+        // Revenue = Base Rate * Nights (Excluding Fees)
+        const baseRevenue = unitBookings.reduce((sum, b) => sum + (b.nightly_rate * b.nights), 0);
+        
+        const expenseTotal = unitExpenses.reduce((sum, e) => sum + e.amount, 0);
+        const net = baseRevenue - expenseTotal;
+
+        grandRev += baseRevenue;
+        grandExp += expenseTotal;
+        grandNet += net;
+
+        // Visual helpers
+        const netColor = net >= 0 ? '#166534' : '#991b1b'; // Green or Red
+        const netBg = net >= 0 ? '#dcfce7' : '#fee2e2';
+
+        rowsHtml += `
+            <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 12px; font-weight: bold; color: #1f2937;">${unit.name}</td>
+                <td style="padding: 12px; text-align: center; color: #4b5563;">${unitBookings.length}</td>
+                <td style="padding: 12px; text-align: right; color: #047857; font-family: monospace; font-size: 13px;">
+                    ${baseRevenue.toLocaleString()}
+                </td>
+                <td style="padding: 12px; text-align: right; color: #b91c1c; font-family: monospace; font-size: 13px;">
+                    ${expenseTotal.toLocaleString()}
+                </td>
+                <td style="padding: 12px; text-align: right; font-weight: bold; color: ${netColor}; background-color: ${netBg}; font-family: monospace; font-size: 14px;">
+                    ${net.toLocaleString()}
+                </td>
+            </tr>
+        `;
+    });
+
+    const html = `
+      <div style="padding: 40px; font-family: 'Cairo', sans-serif; color: #111827;">
+        <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #e5e7eb; padding-bottom: 20px;">
+          <h1 style="font-size: 32px; font-weight: 800; color: #0284c7;">Sunlight Village</h1>
+          <h2 style="font-size: 20px; color: #4b5563; margin-top: 5px;">Financial Summary & Profit/Loss</h2>
+          <p style="color: #6b7280; font-size: 12px; margin-top:10px;">
+             Generated: ${format(new Date(), 'yyyy-MM-dd HH:mm')}
+          </p>
         </div>
-  
-        <div class="bg-white rounded-xl overflow-hidden mb-8 border border-gray-200">
-          <table class="w-full">
-            <thead class="bg-gray-800 text-white">
-              <tr>
-                <th class="p-4 text-xs uppercase tracking-wider font-bold ${isRTL ? 'text-right' : 'text-left'}">${t('tenant')}</th>
-                <th class="p-4 text-xs uppercase tracking-wider font-bold ${isRTL ? 'text-right' : 'text-left'}">${t('dates')}</th>
-                <th class="p-4 text-xs uppercase tracking-wider font-bold ${isRTL ? 'text-right' : 'text-left'}">Duration</th>
-                <th class="p-4 text-xs uppercase tracking-wider font-bold ${isRTL ? 'text-left' : 'text-right'}">${t('status')}</th>
-              </tr>
+        
+        <div style="margin-bottom: 20px; font-size: 12px; color: #b91c1c; background: #fef2f2; padding: 10px; border-radius: 6px; border: 1px solid #fecaca;">
+            <strong>Note:</strong> Revenue is calculated based on Base Nightly Rate only. Village Fees and Housekeeping charges are excluded from Profit calculations.
+        </div>
+
+        <table style="width: 100%; border-collapse: collapse; font-size: 14px; box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);">
+            <thead style="background-color: #1f2937; color: white;">
+                <tr>
+                    <th style="padding: 14px; text-align: ${isRTL?'right':'left'}; border-top-left-radius: 8px;">Unit Name</th>
+                    <th style="padding: 14px; text-align: center;">Bookings</th>
+                    <th style="padding: 14px; text-align: right;">Rental Revenue (Base)</th>
+                    <th style="padding: 14px; text-align: right;">Expenses</th>
+                    <th style="padding: 14px; text-align: right; border-top-right-radius: 8px;">Net Profit</th>
+                </tr>
             </thead>
-            <tbody>
-              ${rowsHtml}
-            </tbody>
-          </table>
+            <tbody>${rowsHtml}</tbody>
+            <tfoot style="background-color: #f3f4f6; font-weight: bold; border-top: 2px solid #374151;">
+                <tr>
+                    <td style="padding: 16px; font-size: 15px;">GRAND TOTAL</td>
+                    <td style="padding: 16px; text-align: center;">-</td>
+                    <td style="padding: 16px; text-align: right; color: #047857;">${grandRev.toLocaleString()}</td>
+                    <td style="padding: 16px; text-align: right; color: #b91c1c;">${grandExp.toLocaleString()}</td>
+                    <td style="padding: 16px; text-align: right; font-size: 18px; color: ${grandNet >= 0 ? '#166534' : '#991b1b'};">
+                        ${grandNet.toLocaleString()}
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
+        
+        <div style="margin-top: 40px; text-align: center; color: #9ca3af; font-size: 11px;">
+            Sunlight Village Manager System
         </div>
       </div>
     `;
-  
-    await generatePdfFromHtml(html, `Occupancy_Report_${format(new Date(), 'yyyyMMdd')}.pdf`, isRTL);
+    await generatePdfFromHtml(html, `Financial_Profit_Report_Net.pdf`, isRTL);
 };

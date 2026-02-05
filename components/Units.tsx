@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { UnitType, Unit } from '../types';
-import { Plus, Home, Edit2, Trash2, Check, X, AlertTriangle } from 'lucide-react';
+import { Plus, Home, Edit2, Trash2, Check, X, AlertTriangle, Loader2 } from 'lucide-react';
 
 export const Units = () => {
   const { t, state, addUnit, updateUnit, deleteUnit } = useApp();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [unitToDelete, setUnitToDelete] = useState<Unit | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Form State
   const [name, setName] = useState('');
@@ -53,8 +54,13 @@ export const Units = () => {
 
   const confirmDelete = async () => {
     if (unitToDelete) {
-        await deleteUnit(unitToDelete.id);
-        setUnitToDelete(null);
+        setIsDeleting(true);
+        try {
+            await deleteUnit(unitToDelete.id);
+        } finally {
+            setIsDeleting(false);
+            setUnitToDelete(null); // Ensure modal closes regardless of success/error
+        }
     }
   };
 
@@ -160,7 +166,7 @@ export const Units = () => {
             
             <div className="flex flex-col items-center text-center">
                 <div className="p-4 bg-red-100 dark:bg-red-900/20 text-red-600 rounded-full mb-6 ring-8 ring-red-50 dark:ring-red-900/10">
-                    <AlertTriangle size={36} strokeWidth={2.5} />
+                    {isDeleting ? <Loader2 size={36} className="animate-spin" /> : <AlertTriangle size={36} strokeWidth={2.5} />}
                 </div>
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Delete {unitToDelete.name}?</h3>
                 
@@ -189,17 +195,23 @@ export const Units = () => {
                     <button 
                         type="button"
                         onClick={() => setUnitToDelete(null)}
-                        className="flex-1 p-3.5 rounded-xl border border-gray-200 dark:border-gray-700 font-bold hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors text-gray-700 dark:text-gray-300"
+                        disabled={isDeleting}
+                        className="flex-1 p-3.5 rounded-xl border border-gray-200 dark:border-gray-700 font-bold hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors text-gray-700 dark:text-gray-300 disabled:opacity-50"
                     >
                         {t('cancel')}
                     </button>
                     <button 
                         type="button"
                         onClick={confirmDelete}
-                        className="flex-1 p-3.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold shadow-lg shadow-red-500/30 transition-all flex items-center justify-center gap-2"
+                        disabled={isDeleting}
+                        className="flex-1 p-3.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold shadow-lg shadow-red-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                     >
-                        <Trash2 size={18} />
-                        Delete Unit
+                        {isDeleting ? 'Deleting...' : (
+                            <>
+                                <Trash2 size={18} />
+                                Delete Unit
+                            </>
+                        )}
                     </button>
                 </div>
             </div>

@@ -1,16 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Access environment variables
-const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
-const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+// --- CONFIGURATION ---
+const SUPABASE_URL = 'https://nvnykdzmshpwcevipkdl.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im52bnlrZHptc2hwd2Nldmlwa2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMzg3MTMsImV4cCI6MjA4NTgxNDcxM30.wRhhTppNxyFA_eR8atNhc9DG38A4Eg381gYAzfnn88w';
 
-// FORCE MOCK MODE:
-// We return 'null' if keys are missing OR if we want to force local state for testing.
-// This fixes the "Booking not saving" issue caused by invalid DB connections.
-export const supabase = (supabaseUrl && supabaseKey && supabaseUrl !== 'YOUR_SUPABASE_URL') 
-  ? createClient(supabaseUrl, supabaseKey) 
+// Check if keys are valid
+const isConfigured = SUPABASE_URL && SUPABASE_ANON_KEY;
+
+export const supabase = isConfigured 
+  ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
   : null;
 
 if (!supabase) {
-  console.log("%c Running in MOCK MODE ", "background: #222; color: #bada55; padding: 4px; border-radius: 4px;");
+  console.warn("%c Supabase Not Connected! ", "background: #f59e0b; color: black; padding: 4px; border-radius: 4px; font-weight: bold;");
+  console.log("Running in local Mock Mode. Data will not be saved to the database.");
+} else {
+  console.log("%c Supabase Connected ", "background: #10b981; color: white; padding: 4px; border-radius: 4px; font-weight: bold;");
 }
