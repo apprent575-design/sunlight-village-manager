@@ -229,27 +229,26 @@ export const generateOccupancyReport = async (units: Unit[], bookings: Booking[]
 
         let unitRows = '';
         let totalNights = 0;
-        let totalBase = 0;
-        let totalFees = 0;
+        let totalBase = 0; // Total Without Fees
+        let totalFees = 0; // Village Fees
         let totalHousekeeping = 0;
-        let totalGrand = 0;
+        let totalGrand = 0; // Total With Fees
 
         unitBookings.forEach(b => {
              const statusColor = b.status === BookingStatus.CONFIRMED ? '#166534' : (b.status === BookingStatus.CANCELLED ? '#991b1b' : '#854d0e');
              
              // Calculate Breakdown
-             const baseRent = b.nightly_rate * b.nights;
+             const baseRent = b.nightly_rate * b.nights; // Amount without fees
              const houseKeeping = b.housekeeping_enabled ? (b.housekeeping_price || 0) : 0;
-             // Village Fees is implied from remaining amount, or calculated explicitly
-             // Total = Base + Housekeeping + VillageFees. So VillageFees = Total - Base - Housekeeping
-             const fees = b.total_rental_price - baseRent - houseKeeping; 
+             const villageFees = (b.village_fee || 0) * b.nights;
+             const grandTotal = b.total_rental_price;
              
              if (b.status !== BookingStatus.CANCELLED) {
                  totalNights += b.nights;
                  totalBase += baseRent;
-                 totalFees += fees;
+                 totalFees += villageFees;
                  totalHousekeeping += houseKeeping;
-                 totalGrand += b.total_rental_price;
+                 totalGrand += grandTotal;
              }
 
              unitRows += `
@@ -262,14 +261,14 @@ export const generateOccupancyReport = async (units: Unit[], bookings: Booking[]
                    <td style="padding: 10px; text-align: right; color: #0369a1; font-family: monospace;">
                      ${baseRent.toLocaleString()}
                    </td>
-                   <td style="padding: 10px; text-align: right; color: #d97706; font-size: 11px;">
-                     ${houseKeeping > 0 ? houseKeeping.toLocaleString() : '-'}
-                   </td>
                    <td style="padding: 10px; text-align: right; color: #64748b; font-size: 11px;">
-                     ${fees > 0 ? '+' : ''}${fees.toLocaleString()}
+                     ${villageFees > 0 ? '+' : ''}${villageFees.toLocaleString()}
                    </td>
-                   <td style="padding: 10px; text-align: right; font-weight: bold;">
-                     ${b.total_rental_price.toLocaleString()}
+                   <td style="padding: 10px; text-align: right; color: #d97706; font-size: 11px;">
+                     ${houseKeeping > 0 ? '+' + houseKeeping.toLocaleString() : '-'}
+                   </td>
+                   <td style="padding: 10px; text-align: right; font-weight: bold; background-color: #f0f9ff;">
+                     ${grandTotal.toLocaleString()}
                    </td>
 
                    <td style="padding: 10px; text-align: right; color: ${statusColor}; font-weight: bold; font-size: 11px;">${b.status}</td>
@@ -280,13 +279,13 @@ export const generateOccupancyReport = async (units: Unit[], bookings: Booking[]
         unitRows += `
             <tr style="background-color: #f3f4f6; font-weight: bold; border-top: 2px solid #d1d5db;">
                 <td colspan="3" style="padding: 10px; text-align: ${isRTL ? 'left' : 'right'}; color: #4b5563;">
-                    ${isRTL ? 'إجمالي الوحدة (المؤكدة)' : 'Unit Total (Confirmed/Pending)'}
+                    ${isRTL ? 'إجمالي الوحدة (المؤكدة)' : 'Unit Total (Confirmed)'}
                 </td>
                 <td style="padding: 10px; text-align: center;">${totalNights}</td>
-                <td style="padding: 10px; text-align: right;">${totalBase.toLocaleString()}</td>
-                <td style="padding: 10px; text-align: right; color: #d97706;">${totalHousekeeping.toLocaleString()}</td>
+                <td style="padding: 10px; text-align: right; color: #0369a1;">${totalBase.toLocaleString()}</td>
                 <td style="padding: 10px; text-align: right;">${totalFees.toLocaleString()}</td>
-                <td style="padding: 10px; text-align: right;">${totalGrand.toLocaleString()}</td>
+                <td style="padding: 10px; text-align: right; color: #d97706;">${totalHousekeeping.toLocaleString()}</td>
+                <td style="padding: 10px; text-align: right; background-color: #e0f2fe; color: #0c4a6e;">${totalGrand.toLocaleString()}</td>
                 <td></td>
             </tr>
         `;
@@ -303,10 +302,10 @@ export const generateOccupancyReport = async (units: Unit[], bookings: Booking[]
                         <th style="padding:10px; text-align:${isRTL?'right':'left'}">Phone</th>
                         <th style="padding:10px; text-align:${isRTL?'right':'left'}">Dates</th>
                         <th style="padding:10px; text-align:center">Nights</th>
-                        <th style="padding:10px; text-align:right">Base Rent</th>
+                        <th style="padding:10px; text-align:right">Total (Excl. Fees)</th>
+                        <th style="padding:10px; text-align:right">Village Fees</th>
                         <th style="padding:10px; text-align:right">Housekeeping</th>
-                        <th style="padding:10px; text-align:right">Fees</th>
-                        <th style="padding:10px; text-align:right">Total</th>
+                        <th style="padding:10px; text-align:right; background-color:#e0f2fe;">Total (Incl. Fees)</th>
                         <th style="padding:10px; text-align:right">Status</th>
                     </tr></thead>
                     <tbody>${unitRows}</tbody>
@@ -316,8 +315,8 @@ export const generateOccupancyReport = async (units: Unit[], bookings: Booking[]
 
     const html = `
       <div style="padding: 40px; font-family: 'Cairo', sans-serif; color: #111827;">
-        <h1 style="text-align:center; color:#0284c7; margin-bottom:10px; font-size: 28px; font-weight: 800;">Detailed Occupancy Report</h1>
-        <p style="text-align:center; color:#6b7280; font-size: 12px; margin-bottom: 40px;">Breakdown of Base Rent, Housekeeping, and Fees</p>
+        <h1 style="text-align:center; color:#0284c7; margin-bottom:10px; font-size: 28px; font-weight: 800;">Occupancy Report</h1>
+        <p style="text-align:center; color:#6b7280; font-size: 12px; margin-bottom: 40px;">Detailed breakdown of rent, village fees, and housekeeping.</p>
         ${contentHtml || '<p style="text-align:center; padding: 20px; color: #666;">No bookings found.</p>'}
       </div>`;
     await generatePdfFromHtml(html, `Occupancy_Detailed.pdf`, isRTL);
