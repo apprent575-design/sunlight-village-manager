@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sunlight Village Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/react-big-calendar@1.19.0/lib/css/react-big-calendar.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Cairo', 'sans-serif'],
+            },
+            colors: {
+              primary: {
+                50: '#f0f9ff',
+                100: '#e0f2fe',
+                500: '#0ea5e9',
+                600: '#0284c7',
+                700: '#0369a1',
+              }
+            }
+          },
+        },
+      }
+    </script>
+    <style>
+      /* --- Custom Calendar Theme (Modern & Glassmorphism) --- */
+      
+      .rbc-calendar { 
+        font-family: 'Cairo', sans-serif; 
+      }
+
+      /* Calendar Grid Styling */
+      .rbc-month-view {
+        border: 1px solid rgba(203, 213, 225, 0.6); /* Slate 300 */
+        border-radius: 16px;
+        overflow: hidden;
+        background: rgba(255, 255, 255, 0.3);
+      }
+
+      .rbc-header {
+        padding: 12px 0;
+        font-weight: 700;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.1em;
+        color: #64748b; /* Slate 500 */
+        border-bottom: 1px solid rgba(203, 213, 225, 0.6) !important;
+      }
+
+      /* Cell Styling */
+      .rbc-day-bg {
+        transition: background-color 0.2s;
+      }
+      .rbc-day-bg:hover {
+        background-color: rgba(241, 245, 249, 0.4);
+      }
+      .rbc-day-bg + .rbc-day-bg {
+        border-left: 1px solid rgba(203, 213, 225, 0.6) !important;
+      }
+      .rbc-month-row + .rbc-month-row {
+        border-top: 1px solid rgba(203, 213, 225, 0.6) !important;
+      }
+      .rbc-off-range-bg {
+        background-color: rgba(248, 250, 252, 0.5); /* Slate 50 */
+      }
+
+      /* Date Number Styling */
+      .rbc-date-cell {
+        padding: 8px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #64748b; /* Slate 500 */
+        opacity: 0.8;
+      }
+      
+      /* Today Highlight */
+      .rbc-today {
+        background-color: rgba(14, 165, 233, 0.04) !important;
+      }
+      .rbc-now .rbc-button-link {
+        background-color: #0ea5e9;
+        color: white;
+        border-radius: 50%;
+        width: 24px;
+        height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-left: auto;
+        font-size: 0.75rem;
+        box-shadow: 0 4px 6px -1px rgba(14, 165, 233, 0.3);
+      }
+
+      /* Events Styling - Clean Reset */
+      .rbc-event {
+        border-radius: 6px !important;
+        padding: 2px 4px !important;
+        background: transparent !important; /* Allow dynamic colors from component */
+        border: none !important; /* Allow dynamic borders */
+        min-height: 42px; /* Ensure space for custom content */
+        margin-bottom: 2px !important;
+      }
+      
+      .rbc-event:focus {
+        outline: none;
+      }
+      
+      /* Ensure content flows correctly */
+      .rbc-event-content {
+         font-size: 0.75rem;
+         white-space: nowrap;
+         overflow: hidden;
+      }
+
+      /* --- Dark Mode Overrides --- */
+      .dark .rbc-month-view {
+        border-color: rgba(51, 65, 85, 0.5);
+        background: rgba(15, 23, 42, 0.2);
+      }
+      .dark .rbc-header {
+        color: #94a3b8; /* Slate 400 */
+        border-bottom-color: rgba(51, 65, 85, 0.5) !important;
+      }
+      .dark .rbc-day-bg:hover {
+        background-color: rgba(30, 41, 59, 0.3);
+      }
+      .dark .rbc-day-bg + .rbc-day-bg {
+        border-left-color: rgba(51, 65, 85, 0.5) !important;
+      }
+      .dark .rbc-month-row + .rbc-month-row {
+        border-top-color: rgba(51, 65, 85, 0.5) !important;
+      }
+      .dark .rbc-off-range-bg {
+        background-color: rgba(2, 6, 23, 0.2);
+      }
+      .dark .rbc-date-cell {
+        color: #cbd5e1; /* Slate 300 */
+      }
+      .dark .rbc-today {
+        background-color: rgba(14, 165, 233, 0.08) !important;
+      }
+      
+      /* Glassmorphism Utilities */
+      .glass {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+      }
+      .dark .glass {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      
+      /* Popup override for mobile */
+      .rbc-overlay {
+        background: rgba(255,255,255,0.95);
+        backdrop-filter: blur(12px);
+        border-radius: 16px;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        border: 1px solid #e2e8f0;
+        padding: 8px;
+      }
+      .dark .rbc-overlay {
+        background: rgba(15,23,42,0.95);
+        border-color: #334155;
+      }
+      .dark .rbc-overlay-header {
+        border-bottom-color: #334155;
+        color: white;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "jspdf": "https://esm.sh/jspdf@^2.5.1",
+    "html2canvas": "https://esm.sh/html2canvas@^1.4.1",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "recharts": "https://esm.sh/recharts@^3.7.0",
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.13.0",
+    "lucide-react": "https://esm.sh/lucide-react@^0.563.0",
+    "react/": "https://esm.sh/react@^19.2.4/",
+    "react": "https://esm.sh/react@^19.2.4",
+    "date-fns/": "https://esm.sh/date-fns@^4.1.0/",
+    "date-fns": "https://esm.sh/date-fns@^4.1.0",
+    "react-big-calendar": "https://esm.sh/react-big-calendar@^1.19.4",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.94.1",
+    "jspdf-autotable": "https://esm.sh/jspdf-autotable@^3.8.1"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-gray-50 dark:bg-slate-900 text-gray-900 dark:text-gray-100 transition-colors duration-200">
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>
