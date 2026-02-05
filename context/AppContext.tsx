@@ -58,7 +58,8 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   // 3. Initialize Data & Auth
   useEffect(() => {
     if (!supabase) {
-      // Fallback to Mock Data if no Supabase keys
+      // Fallback to Mock Data ONLY if no Supabase keys are configured in lib/supabase.ts
+      console.warn("Using Mock Data (No Supabase Connection)");
       setUnits(MOCK_UNITS as Unit[]);
       setBookings(MOCK_BOOKINGS as Booking[]);
       setExpenses(MOCK_EXPENSES as Expense[]);
@@ -189,7 +190,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   // --- Database Actions ---
 
   const addBooking = async (booking: Booking) => {
-    checkAvailability(booking); // Will throw if occupied
+    checkAvailability(booking); 
 
     if (!supabase) {
       setBookings(prev => [booking, ...prev]);
@@ -198,19 +199,8 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     // Optimistic Update
     setBookings(prev => [booking, ...prev]);
 
-    // Sanitize Payload: Remove fields that don't exist in Supabase schema yet
-    // This prevents the "Could not find column" error
-    const { 
-        village_fee, 
-        housekeeping_enabled, 
-        housekeeping_price, 
-        deposit_enabled, 
-        deposit_amount, 
-        tenant_rating_good,
-        ...dbPayload 
-    } = booking;
-
-    const { error } = await supabase.from('bookings').insert([dbPayload]);
+    // Send full object. Ensure SQL columns exist!
+    const { error } = await supabase.from('bookings').insert([booking]);
     if (error) { 
         console.error(error);
         setBookings(prev => prev.filter(b => b.id !== booking.id)); // Rollback
@@ -219,7 +209,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   };
 
   const updateBooking = async (updatedBooking: Booking) => {
-    checkAvailability(updatedBooking); // Will throw if occupied
+    checkAvailability(updatedBooking); 
 
     if (!supabase) {
       setBookings(prev => prev.map(b => b.id === updatedBooking.id ? updatedBooking : b));
@@ -229,18 +219,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     const original = bookings.find(b => b.id === updatedBooking.id);
     setBookings(prev => prev.map(b => b.id === updatedBooking.id ? updatedBooking : b)); // Optimistic
 
-    // Sanitize Payload: Remove fields that don't exist in Supabase schema yet
-    const { 
-        village_fee, 
-        housekeeping_enabled, 
-        housekeeping_price, 
-        deposit_enabled, 
-        deposit_amount, 
-        tenant_rating_good,
-        ...dbPayload 
-    } = updatedBooking;
-
-    const { error } = await supabase.from('bookings').update(dbPayload).eq('id', updatedBooking.id);
+    const { error } = await supabase.from('bookings').update(updatedBooking).eq('id', updatedBooking.id);
     if (error) { 
         console.error(error);
         if(original) setBookings(prev => prev.map(b => b.id === updatedBooking.id ? original : b)); // Rollback

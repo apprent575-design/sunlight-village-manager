@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Expense } from '../types';
-import { Plus, Download, Calendar, Edit2, Trash2, Check, X } from 'lucide-react';
+import { Plus, Download, Calendar, Edit2, Trash2, Check, X, AlertTriangle, Loader2 } from 'lucide-react';
 import { format, isWithinInterval, isValid } from 'date-fns';
 import { generateExpenseReport } from '../utils/pdfGenerator';
 
@@ -9,6 +9,10 @@ export const Expenses = () => {
   const { t, state, addExpense, updateExpense, deleteExpense, language } = useApp();
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  
+  // Delete State
+  const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   
   // Filters
   const [filterUnit, setFilterUnit] = useState<string>('all');
@@ -67,13 +71,19 @@ export const Expenses = () => {
     setShowAdd(true);
   };
 
-  const handleDelete = async (id: string) => {
-    const message = language === 'ar' 
-        ? "هل أنت متأكد أنك تريد حذف هذا المصروف؟ لا يمكن التراجع عن هذا الإجراء." 
-        : "Are you sure you want to delete this expense? This action cannot be undone.";
-        
-    if(confirm(message)) {
-        await deleteExpense(id);
+  const handleDeleteClick = (expense: Expense) => {
+    setExpenseToDelete(expense);
+  };
+
+  const confirmDelete = async () => {
+    if (expenseToDelete) {
+        setIsDeleting(true);
+        try {
+            await deleteExpense(expenseToDelete.id);
+        } finally {
+            setIsDeleting(false);
+            setExpenseToDelete(null);
+        }
     }
   };
 
@@ -90,7 +100,7 @@ export const Expenses = () => {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 relative">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h2 className="text-3xl font-bold text-gray-800 dark:text-white">{t('expenses')}</h2>
         
@@ -151,6 +161,23 @@ export const Expenses = () => {
               <input required type="text" className="w-full p-2 rounded-lg border dark:bg-slate-800 dark:border-gray-700" value={expenseData.title} onChange={e => setExpenseData({...expenseData, title: e.target.value})} />
             </div>
             <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-500 uppercase">{t('category')}</label>
+              <select 
+                className="w-full p-2 rounded-lg border dark:bg-slate-800 dark:border-gray-700"
+                value={expenseData.category} 
+                onChange={e => setExpenseData({...expenseData, category: e.target.value})}
+              >
+                <option value="Maintenance">Maintenance</option>
+                <option value="Electricity">Electricity</option>
+                <option value="Water">Water</option>
+                <option value="Internet">Internet</option>
+                <option value="Gas">Gas</option>
+                <option value="Cleaning Supplies">Cleaning Supplies</option>
+                <option value="Furniture">Furniture</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div className="space-y-1">
               <label className="text-xs font-bold text-gray-500 uppercase">{t('amount')} ({t('currency')})</label>
               <input required type="number" className="w-full p-2 rounded-lg border dark:bg-slate-800 dark:border-gray-700" value={expenseData.amount} onChange={e => setExpenseData({...expenseData, amount: parseFloat(e.target.value)})} />
             </div>
@@ -195,7 +222,11 @@ export const Expenses = () => {
                 <td className="p-4">{isValid(d) ? format(d, 'MMM dd, yyyy') : 'Invalid Date'}</td>
                 <td className="p-4">{state.units.find(u => u.id === expense.unit_id)?.name}</td>
                 <td className="p-4 font-medium">{expense.title}</td>
-                <td className="p-4 text-sm text-gray-500">{expense.category}</td>
+                <td className="p-4 text-sm text-gray-500">
+                    <span className="bg-gray-100 dark:bg-slate-700 px-2 py-1 rounded text-xs">
+                        {expense.category || 'Maintenance'}
+                    </span>
+                </td>
                 <td className="p-4 text-right font-mono text-red-500">-{expense.amount} {t('currency')}</td>
                 <td className="p-4 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button 
@@ -206,7 +237,7 @@ export const Expenses = () => {
                         <Edit2 size={16} />
                     </button>
                     <button 
-                        onClick={() => handleDelete(expense.id)}
+                        onClick={() => handleDeleteClick(expense)}
                         className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
                         title="Delete"
                     >
@@ -225,6 +256,50 @@ export const Expenses = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {expenseToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="glass bg-white dark:bg-slate-900 w-full max-w-md p-8 rounded-3xl shadow-2xl animate-in fade-in zoom-in duration-200 border border-red-100 dark:border-red-900/30">
+            
+            <div className="flex flex-col items-center text-center">
+                <div className="p-4 bg-red-100 dark:bg-red-900/20 text-red-600 rounded-full mb-6 ring-8 ring-red-50 dark:ring-red-900/10">
+                    {isDeleting ? <Loader2 size={36} className="animate-spin" /> : <AlertTriangle size={36} strokeWidth={2.5} />}
+                </div>
+                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Delete Expense?</h3>
+                <p className="text-gray-500 dark:text-gray-400 mb-8">
+                    Are you sure you want to remove <br/>
+                    <span className="font-bold text-gray-800 dark:text-gray-200">{expenseToDelete.title}</span>? 
+                    <br/>This action cannot be undone.
+                </p>
+
+                <div className="flex gap-3 w-full">
+                    <button 
+                        type="button"
+                        onClick={() => setExpenseToDelete(null)}
+                        disabled={isDeleting}
+                        className="flex-1 p-3.5 rounded-xl border border-gray-200 dark:border-gray-700 font-bold hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors text-gray-700 dark:text-gray-300 disabled:opacity-50"
+                    >
+                        {t('cancel')}
+                    </button>
+                    <button 
+                        type="button"
+                        onClick={confirmDelete}
+                        disabled={isDeleting}
+                        className="flex-1 p-3.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold shadow-lg shadow-red-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                        {isDeleting ? 'Deleting...' : (
+                            <>
+                                <Trash2 size={18} />
+                                Delete
+                            </>
+                        )}
+                    </button>
+                </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

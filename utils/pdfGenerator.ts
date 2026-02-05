@@ -211,8 +211,93 @@ export const generateReceipt = async (booking: Booking, unitName: string, lang: 
   await generatePdfFromHtml(html, `Receipt_${booking.tenant_name}.pdf`, isRTL);
 };
 
+// --- NEW EXPENSE REPORT (Detailed Grouping) ---
 export const generateExpenseReport = async (expenses: Expense[], units: Unit[], lang: Language, t: any) => {
-    await generateFinancialReport(units, [], expenses, lang, t); 
+    const isRTL = lang === 'ar';
+    let grandTotal = 0;
+    let unitsHtml = '';
+
+    // Get unique unit IDs from the filtered expenses
+    const uniqueUnitIds = Array.from(new Set(expenses.map(e => e.unit_id)));
+
+    uniqueUnitIds.forEach(unitId => {
+        // Find unit details
+        const unit = units.find(u => u.id === unitId);
+        const unitName = unit ? unit.name : (isRTL ? 'وحدة غير معروفة' : 'Unknown Unit');
+        
+        // Filter expenses for this unit
+        const unitExpenses = expenses.filter(e => e.unit_id === unitId);
+        const unitTotal = unitExpenses.reduce((sum, e) => sum + e.amount, 0);
+        grandTotal += unitTotal;
+
+        // Create rows for this unit
+        const rows = unitExpenses.map(e => `
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+                <td style="padding: 10px; color: #475569;">${format(new Date(e.date), 'yyyy-MM-dd')}</td>
+                <td style="padding: 10px; font-weight: 600; color: #1e293b;">${e.title}</td>
+                <td style="padding: 10px; color: #64748b;">${e.category || '-'}</td>
+                <td style="padding: 10px; text-align: right; color: #b91c1c; font-family: monospace;">${e.amount.toLocaleString()}</td>
+            </tr>
+        `).join('');
+
+        // Append Unit Section
+        unitsHtml += `
+            <div style="margin-bottom: 30px; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; page-break-inside: avoid;">
+                <div style="background: #f8fafc; padding: 12px 20px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0; color: #0f172a; font-size: 16px; font-weight: 700;">${unitName}</h3>
+                    <span style="font-size: 12px; color: #64748b; background: #e2e8f0; padding: 2px 8px; rounded-full;">${unitExpenses.length} Records</span>
+                </div>
+                <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                    <thead>
+                        <tr style="background: #ffffff; border-bottom: 2px solid #f1f5f9;">
+                            <th style="text-align: ${isRTL ? 'right' : 'left'}; padding: 10px; color: #94a3b8; font-size: 11px; text-transform: uppercase;">Date</th>
+                            <th style="text-align: ${isRTL ? 'right' : 'left'}; padding: 10px; color: #94a3b8; font-size: 11px; text-transform: uppercase;">Title</th>
+                            <th style="text-align: ${isRTL ? 'right' : 'left'}; padding: 10px; color: #94a3b8; font-size: 11px; text-transform: uppercase;">Category</th>
+                            <th style="text-align: right; padding: 10px; color: #94a3b8; font-size: 11px; text-transform: uppercase;">Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows}
+                    </tbody>
+                    <tfoot>
+                        <tr style="background: #fef2f2;">
+                            <td colspan="3" style="padding: 12px; text-align: ${isRTL ? 'left' : 'right'}; font-weight: bold; color: #991b1b;">${isRTL ? 'إجمالي الوحدة' : 'Unit Total'}</td>
+                            <td style="padding: 12px; text-align: right; font-weight: 800; color: #991b1b; font-size: 14px;">${unitTotal.toLocaleString()} EGP</td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        `;
+    });
+
+    const html = `
+      <div style="padding: 40px; font-family: 'Cairo', sans-serif; color: #1e293b;">
+        <div style="text-align: center; margin-bottom: 40px; border-bottom: 3px solid #0ea5e9; padding-bottom: 20px;">
+            <h1 style="color: #0284c7; font-size: 28px; margin: 0; font-weight: 800;">Detailed Expense Report</h1>
+            <p style="color: #64748b; font-size: 14px; margin-top: 5px;">${format(new Date(), 'dd MMMM yyyy, HH:mm')}</p>
+        </div>
+
+        ${unitsHtml || '<p style="text-align:center; color:#94a3b8; padding: 20px;">No expenses found for the selected criteria.</p>'}
+
+        ${grandTotal > 0 ? `
+        <div style="margin-top: 40px; background: #1e293b; color: white; padding: 20px; rounded-xl; display: flex; justify-content: space-between; align-items: center; page-break-inside: avoid;">
+            <div>
+                <span style="display: block; font-size: 12px; opacity: 0.7; text-transform: uppercase; letter-spacing: 1px;">Grand Total Expenses</span>
+                <span style="font-size: 12px; opacity: 0.7;">Across ${uniqueUnitIds.length} Unit(s)</span>
+            </div>
+            <div style="font-size: 24px; font-weight: 800;">
+                ${grandTotal.toLocaleString()} <span style="font-size: 14px; font-weight: normal;">EGP</span>
+            </div>
+        </div>
+        ` : ''}
+
+        <div style="margin-top: 40px; text-align: center; font-size: 11px; color: #cbd5e1;">
+            Sunlight Village Manager • Financial Records
+        </div>
+      </div>
+    `;
+
+    await generatePdfFromHtml(html, `Expense_Report_Detailed.pdf`, isRTL);
 };
 
 // --- NEW DETAILED OCCUPANCY REPORT ---

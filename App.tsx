@@ -14,24 +14,24 @@ import { Auth } from './components/Auth';
 const AppContent = () => {
   const { user } = useApp();
 
-  if (!user) {
-    return <Auth />;
-  }
-
   return (
     <HashRouter>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/bookings" element={<Bookings />} />
-          <Route path="/calendar" element={<CalendarView />} />
-          <Route path="/expenses" element={<Expenses />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/units" element={<Units />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Layout>
+      {!user ? (
+        <Auth />
+      ) : (
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/bookings" element={<Bookings />} />
+            <Route path="/calendar" element={<CalendarView />} />
+            <Route path="/expenses" element={<Expenses />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/units" element={<Units />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Layout>
+      )}
     </HashRouter>
   );
 };
