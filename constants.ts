@@ -1,3 +1,4 @@
+
 import { Language } from './types';
 
 export const TRANSLATIONS = {
@@ -75,6 +76,17 @@ export const TRANSLATIONS = {
     unitName: 'Unit Name',
     addUnit: 'Add Unit',
     updateUnit: 'Update Unit',
+    // Reports Translations
+    financialSummary: 'Financial Summary',
+    financialSummaryDesc: 'Download net profit and revenue breakdown.',
+    occupancyReport: 'Occupancy Report',
+    occupancyReportDesc: 'Detailed view of unit usage and tenant history.',
+    downloadPDF: 'Download PDF',
+    snapshot: 'Snapshot',
+    totalBookings: 'Total Bookings',
+    totalUnits: 'Total Units',
+    expenseRecords: 'Expense Records',
+    today: 'Today',
   },
   ar: {
     dashboard: 'لوحة التحكم',
@@ -150,6 +162,17 @@ export const TRANSLATIONS = {
     unitName: 'اسم الوحدة',
     addUnit: 'إضافة وحدة',
     updateUnit: 'تحديث الوحدة',
+    // Reports Translations
+    financialSummary: 'الملخص المالي',
+    financialSummaryDesc: 'تحميل تفاصيل صافي الربح والإيرادات.',
+    occupancyReport: 'تقرير الإشغال',
+    occupancyReportDesc: 'عرض تفصيلي لاستخدام الوحدات وسجل المستأجرين.',
+    downloadPDF: 'تحميل PDF',
+    snapshot: 'لقطة سريعة',
+    totalBookings: 'إجمالي الحجوزات',
+    totalUnits: 'إجمالي الوحدات',
+    expenseRecords: 'سجلات المصروفات',
+    today: 'اليوم',
   }
 };
 

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { UserPlus, LogIn, AlertCircle } from 'lucide-react';
+import { UserPlus, LogIn, AlertCircle, ArrowRight } from 'lucide-react';
 
 export const Auth = () => {
   const { login, signup, t } = useApp();
@@ -39,35 +39,42 @@ export const Auth = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-slate-900 p-4 relative overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] rounded-full bg-blue-400/20 blur-[100px]" />
-      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] rounded-full bg-teal-400/20 blur-[100px]" />
+      
+      {/* Animated Background Blobs */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
+          <div className="absolute top-[-10%] left-[-10%] w-[40rem] h-[40rem] rounded-full bg-blue-400/30 mix-blend-multiply filter blur-[128px] animate-[pulse_8s_ease-in-out_infinite]" />
+          <div className="absolute top-[20%] right-[-10%] w-[35rem] h-[35rem] rounded-full bg-purple-400/30 mix-blend-multiply filter blur-[128px] animate-[pulse_10s_ease-in-out_infinite_2s]" />
+          <div className="absolute bottom-[-10%] left-[20%] w-[45rem] h-[45rem] rounded-full bg-teal-400/20 mix-blend-multiply filter blur-[128px] animate-[pulse_12s_ease-in-out_infinite_4s]" />
+      </div>
 
-      <div className="glass p-8 rounded-3xl w-full max-w-md shadow-2xl border border-white/50 dark:border-gray-700 z-10 transition-all duration-300">
-        <div className="text-center mb-8">
-           <h1 className="text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-teal-400 mb-2">Sunlight VM</h1>
-           <p className="text-gray-500 dark:text-gray-400">
-             {isLoginMode ? 'Welcome back! Please sign in.' : 'Create an account to get started.'}
+      <div className="glass p-8 md:p-12 rounded-[2.5rem] w-full max-w-[440px] shadow-2xl border border-white/40 dark:border-white/10 z-10 backdrop-blur-xl relative">
+        <div className="text-center mb-10">
+           <div className="w-16 h-16 bg-gradient-to-tr from-blue-500 to-indigo-600 rounded-2xl mx-auto mb-6 shadow-lg shadow-blue-500/30 flex items-center justify-center transform rotate-3">
+              <span className="text-3xl">☀️</span>
+           </div>
+           <h1 className="text-4xl font-black text-gray-800 dark:text-white tracking-tight mb-2">Sunlight</h1>
+           <p className="text-gray-500 dark:text-gray-400 font-medium">
+             {isLoginMode ? 'Sign in to manage your village.' : 'Join the management team.'}
            </p>
         </div>
 
         {errorMsg && (
-          <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-300 rounded-xl flex items-center gap-2 text-sm">
-            <AlertCircle size={16} />
-            {errorMsg}
+          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-200 rounded-2xl flex items-start gap-3 text-sm border border-red-100 dark:border-red-800/50">
+            <AlertCircle size={18} className="shrink-0 mt-0.5" />
+            <span>{errorMsg}</span>
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-5">
           
           {!isLoginMode && (
-             <div className="animate-in fade-in slide-in-from-top-2">
-                <label className="block text-sm font-medium mb-1 dark:text-gray-300">Full Name</label>
+             <div className="animate-in fade-in slide-in-from-top-4 duration-300">
+                <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-1.5 ml-1">Full Name</label>
                 <input 
                   type="text" 
                   required={!isLoginMode}
-                  className="w-full p-3 rounded-xl border bg-white/50 dark:bg-slate-800 border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-primary-500 transition-all text-gray-900 dark:text-white"
-                  placeholder="John Doe"
+                  className="w-full p-3.5 rounded-2xl border bg-gray-50/50 dark:bg-slate-800/50 border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white dark:focus:bg-slate-800 transition-all text-gray-900 dark:text-white placeholder:text-gray-400"
+                  placeholder="e.g. John Doe"
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                 />
@@ -75,23 +82,23 @@ export const Auth = () => {
           )}
 
           <div>
-            <label className="block text-sm font-medium mb-1 dark:text-gray-300">{t('email')}</label>
+            <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-1.5 ml-1">{t('email')}</label>
             <input 
               type="email" 
               required
-              className="w-full p-3 rounded-xl border bg-white/50 dark:bg-slate-800 border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-primary-500 transition-all text-gray-900 dark:text-white"
-              placeholder="admin@sunlight.com"
+              className="w-full p-3.5 rounded-2xl border bg-gray-50/50 dark:bg-slate-800/50 border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white dark:focus:bg-slate-800 transition-all text-gray-900 dark:text-white placeholder:text-gray-400"
+              placeholder="name@company.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
             />
           </div>
           
           <div>
-             <label className="block text-sm font-medium mb-1 dark:text-gray-300">{t('password')}</label>
+             <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-1.5 ml-1">{t('password')}</label>
              <input 
               type="password" 
               required
-              className="w-full p-3 rounded-xl border bg-white/50 dark:bg-slate-800 border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-primary-500 transition-all text-gray-900 dark:text-white"
+              className="w-full p-3.5 rounded-2xl border bg-gray-50/50 dark:bg-slate-800/50 border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white dark:focus:bg-slate-800 transition-all text-gray-900 dark:text-white placeholder:text-gray-400 tracking-widest"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -99,12 +106,12 @@ export const Auth = () => {
           </div>
 
           {!isLoginMode && (
-             <div className="animate-in fade-in slide-in-from-top-2">
-                <label className="block text-sm font-medium mb-1 dark:text-gray-300">Confirm Password</label>
+             <div className="animate-in fade-in slide-in-from-top-4 duration-300">
+                <label className="block text-xs font-bold uppercase text-gray-500 dark:text-gray-400 mb-1.5 ml-1">Confirm Password</label>
                 <input 
                   type="password" 
                   required={!isLoginMode}
-                  className="w-full p-3 rounded-xl border bg-white/50 dark:bg-slate-800 border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-primary-500 transition-all text-gray-900 dark:text-white"
+                  className="w-full p-3.5 rounded-2xl border bg-gray-50/50 dark:bg-slate-800/50 border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-primary-500 focus:bg-white dark:focus:bg-slate-800 transition-all text-gray-900 dark:text-white placeholder:text-gray-400 tracking-widest"
                   placeholder="••••••••"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
@@ -115,27 +122,27 @@ export const Auth = () => {
           <button 
             type="submit" 
             disabled={loading}
-            className="w-full bg-gradient-to-r from-primary-500 to-primary-600 hover:from-primary-600 hover:to-primary-700 text-white p-3 rounded-xl font-bold shadow-lg shadow-primary-500/30 transition-all flex justify-center items-center gap-2 mt-6"
+            className="w-full bg-gradient-to-r from-primary-600 to-indigo-600 hover:from-primary-700 hover:to-indigo-700 text-white p-4 rounded-2xl font-bold shadow-xl shadow-primary-600/30 transition-all transform hover:scale-[1.02] active:scale-[0.98] flex justify-center items-center gap-2 mt-8"
           >
             {loading ? (
                 <span className="animate-pulse">Processing...</span>
             ) : (
                 <>
-                  {isLoginMode ? <LogIn size={20} /> : <UserPlus size={20} />}
                   {isLoginMode ? t('signIn') : 'Create Account'}
+                  <ArrowRight size={20} />
                 </>
             )}
           </button>
         </form>
 
-        <div className="mt-6 text-center">
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-                {isLoginMode ? "Don't have an account?" : "Already have an account?"}
+        <div className="mt-8 text-center">
+            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                {isLoginMode ? "New to Sunlight?" : "Already have an account?"}
                 <button 
                     onClick={() => { setIsLoginMode(!isLoginMode); setErrorMsg(''); }}
-                    className="ml-2 text-primary-600 dark:text-primary-400 font-bold hover:underline focus:outline-none"
+                    className="ml-2 text-primary-600 dark:text-primary-400 font-bold hover:text-primary-700 transition-colors focus:outline-none"
                 >
-                    {isLoginMode ? 'Sign Up' : 'Sign In'}
+                    {isLoginMode ? 'Create Account' : 'Sign In'}
                 </button>
             </p>
         </div>

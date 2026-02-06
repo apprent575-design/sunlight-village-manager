@@ -11,6 +11,7 @@ interface AppContextType {
   user: User | null;
   login: (email: string, password?: string) => Promise<void>;
   signup: (email: string, password?: string, fullName?: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
   logout: () => void;
   state: AppState;
   addBooking: (booking: Booking) => Promise<void>;
@@ -177,6 +178,15 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       }
     });
 
+    if (error) throw error;
+  };
+
+  const updatePassword = async (password: string) => {
+    if (!supabase) {
+        console.log("Mock: Password updated to", password);
+        return;
+    }
+    const { error } = await supabase.auth.updateUser({ password });
     if (error) throw error;
   };
 
@@ -365,6 +375,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       user,
       login,
       signup,
+      updatePassword,
       logout,
       state: { units, bookings, expenses },
       addBooking,

@@ -17,14 +17,14 @@ export const Reports = () => {
              <div className="p-3 bg-blue-100 dark:bg-blue-900 w-fit rounded-lg mb-4">
                 <FileText className="text-blue-600 dark:text-blue-300" size={24} />
              </div>
-             <h3 className="text-xl font-bold dark:text-white">Financial Summary</h3>
-             <p className="text-gray-500 text-sm">Download net profit and revenue breakdown.</p>
+             <h3 className="text-xl font-bold dark:text-white">{t('financialSummary')}</h3>
+             <p className="text-gray-500 text-sm">{t('financialSummaryDesc')}</p>
           </div>
           <button 
             onClick={() => generateFinancialReport(state.units, state.bookings, state.expenses, language, t)}
             className="flex items-center justify-center gap-2 w-full p-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-colors"
           >
-            <Download size={18} /> Download PDF
+            <Download size={18} /> {t('downloadPDF')}
           </button>
         </div>
 
@@ -33,38 +33,38 @@ export const Reports = () => {
              <div className="p-3 bg-purple-100 dark:bg-purple-900 w-fit rounded-lg mb-4">
                 <FileText className="text-purple-600 dark:text-purple-300" size={24} />
              </div>
-             <h3 className="text-xl font-bold dark:text-white">Occupancy Report</h3>
-             <p className="text-gray-500 text-sm">Detailed view of unit usage and tenant history.</p>
+             <h3 className="text-xl font-bold dark:text-white">{t('occupancyReport')}</h3>
+             <p className="text-gray-500 text-sm">{t('occupancyReportDesc')}</p>
           </div>
           <button 
              onClick={() => generateOccupancyReport(state.units, state.bookings, language, t)}
              className="flex items-center justify-center gap-2 w-full p-3 bg-purple-500 text-white rounded-xl hover:bg-purple-600 transition-colors"
           >
-            <Download size={18} /> Download PDF
+            <Download size={18} /> {t('downloadPDF')}
           </button>
         </div>
       </div>
 
       <div className="glass p-6 rounded-2xl">
-        <h3 className="text-lg font-bold mb-4 dark:text-white">Snapshot</h3>
+        <h3 className="text-lg font-bold mb-4 dark:text-white">{t('snapshot')}</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
            <div className="p-4 bg-gray-50 dark:bg-slate-800 rounded-xl text-center">
              <span className="block text-2xl font-bold text-gray-800 dark:text-white">{state.bookings.length}</span>
-             <span className="text-xs text-gray-500 uppercase">Total Bookings</span>
+             <span className="text-xs text-gray-500 uppercase">{t('totalBookings')}</span>
            </div>
            <div className="p-4 bg-gray-50 dark:bg-slate-800 rounded-xl text-center">
              <span className="block text-2xl font-bold text-gray-800 dark:text-white">{state.units.length}</span>
-             <span className="text-xs text-gray-500 uppercase">Total Units</span>
+             <span className="text-xs text-gray-500 uppercase">{t('totalUnits')}</span>
            </div>
            <div className="p-4 bg-gray-50 dark:bg-slate-800 rounded-xl text-center">
              <span className="block text-2xl font-bold text-gray-800 dark:text-white">{state.expenses.length}</span>
-             <span className="text-xs text-gray-500 uppercase">Expense Records</span>
+             <span className="text-xs text-gray-500 uppercase">{t('expenseRecords')}</span>
            </div>
            <div className="p-4 bg-gray-50 dark:bg-slate-800 rounded-xl text-center">
              <span className="block text-2xl font-bold text-gray-800 dark:text-white">
                {format(new Date(), 'MMM dd')}
              </span>
-             <span className="text-xs text-gray-500 uppercase">Today</span>
+             <span className="text-xs text-gray-500 uppercase">{t('today')}</span>
            </div>
         </div>
       </div>
