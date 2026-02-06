@@ -1,8 +1,8 @@
 
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { Calendar, DollarSign, TrendingUp, Users, Clock, CreditCard, Activity, AlertCircle } from 'lucide-react';
-import { format, isValid, addDays, parseISO, isAfter } from 'date-fns';
+import { Calendar, DollarSign, TrendingUp, Users, Clock, CreditCard, Activity, AlertCircle, CheckCircle as CheckIcon, XCircle, PauseCircle } from 'lucide-react';
+import { format, isValid, addDays, parseISO, isAfter, differenceInDays } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 
 const StatCard = ({ title, value, icon: Icon, gradient, trend }: any) => (
@@ -45,13 +45,13 @@ export const Dashboard = () => {
       const activeSubs = allClients.filter(u => {
           if (!u.subscription) return false;
           const end = addDays(parseISO(u.subscription.start_date), u.subscription.duration_days);
-          return isAfter(end, new Date());
+          return isAfter(end, new Date()) && u.subscription.status !== 'paused';
       }).length;
 
       const expiredSubs = allClients.filter(u => {
           if (!u.subscription) return false;
           const end = addDays(parseISO(u.subscription.start_date), u.subscription.duration_days);
-          return !isAfter(end, new Date());
+          return !isAfter(end, new Date()) || u.subscription.status === 'paused';
       }).length;
 
       const totalRevenue = allClients.reduce((sum, u) => sum + (u.subscription?.price || 0), 0);
@@ -64,7 +64,7 @@ export const Dashboard = () => {
                         {t('adminDashboard')}
                     </h2>
                     <p className="text-gray-500 dark:text-gray-400 mt-2 text-lg">
-                        Subscription & Client Overview
+                        Overview & Client Status
                     </p>
                 </div>
                 <div className="text-sm font-medium text-gray-400 bg-white/60 dark:bg-slate-800/60 px-5 py-2.5 rounded-2xl border border-white dark:border-gray-700 shadow-sm backdrop-blur-sm">
@@ -101,19 +101,104 @@ export const Dashboard = () => {
                 />
             </div>
              
-             {/* Admin Quick Action */}
-            <div className="glass p-8 rounded-3xl border border-white/50 dark:border-white/5 text-center space-y-4">
-                <div className="p-4 bg-primary-100 dark:bg-slate-800 w-fit mx-auto rounded-full text-primary-600 dark:text-primary-400">
-                    <CreditCard size={32} />
+             {/* Client Status List */}
+            <div className="glass rounded-3xl overflow-hidden border border-white/50 dark:border-white/5 shadow-card">
+                <div className="p-6 border-b border-gray-100 dark:border-gray-700/50 flex items-center justify-between bg-white/40 dark:bg-slate-800/40">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 rounded-xl">
+                            <Users size={20} />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-800 dark:text-white">Client Status Summary</h3>
+                    </div>
+                    <button 
+                      onClick={() => navigate('/admin/subscriptions')}
+                      className="text-sm font-bold text-primary-600 hover:text-primary-700 transition-colors bg-primary-50 dark:bg-primary-900/10 px-4 py-2 rounded-xl"
+                    >
+                      Manage All
+                    </button>
                 </div>
-                <h3 className="text-2xl font-bold text-gray-800 dark:text-white">Manage Subscriptions</h3>
-                <p className="text-gray-500 max-w-md mx-auto">View all client statuses, renew subscriptions, or add new accounts.</p>
-                <button 
-                    onClick={() => navigate('/admin/subscriptions')}
-                    className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-lg transition-transform hover:scale-105"
-                >
-                    Go to Subscriptions
-                </button>
+                
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead className="bg-gray-50/80 dark:bg-slate-800/80 backdrop-blur-sm text-xs uppercase text-gray-500 dark:text-gray-400 font-bold tracking-wider">
+                            <tr>
+                                <th className="p-5">Client Name</th>
+                                <th className="p-5 text-center">Status</th>
+                                <th className="p-5">Subscription Info</th>
+                                <th className="p-5 text-right">Days Left</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
+                            {allClients.length === 0 && (
+                                <tr>
+                                    <td colSpan={4} className="p-8 text-center text-gray-500 italic">No clients registered yet.</td>
+                                </tr>
+                            )}
+                            {allClients.map(client => {
+                                const sub = client.subscription;
+                                let status = 'No Sub';
+                                let statusColor = 'bg-gray-100 text-gray-500 border-gray-200';
+                                let daysLeft = 0;
+                                let expiryDate = '-';
+                                let StatusIcon = AlertCircle;
+
+                                if (sub) {
+                                    const end = addDays(parseISO(sub.start_date), sub.duration_days);
+                                    expiryDate = format(end, 'MMM dd, yyyy');
+                                    daysLeft = differenceInDays(end, new Date());
+                                    
+                                    if (sub.status === 'paused') {
+                                        status = 'Paused';
+                                        statusColor = 'bg-amber-50 text-amber-600 border-amber-200';
+                                        StatusIcon = PauseCircle;
+                                    } else if (daysLeft > 0) {
+                                        status = 'Active';
+                                        statusColor = 'bg-emerald-50 text-emerald-600 border-emerald-200';
+                                        StatusIcon = CheckIcon;
+                                    } else {
+                                        status = 'Expired';
+                                        statusColor = 'bg-red-50 text-red-600 border-red-200';
+                                        StatusIcon = XCircle;
+                                    }
+                                }
+
+                                return (
+                                    <tr key={client.id} className="hover:bg-gray-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                                        <td className="p-5">
+                                            <div className="font-bold text-gray-800 dark:text-white">{client.full_name}</div>
+                                            <div className="text-xs text-gray-500">{client.email}</div>
+                                        </td>
+                                        <td className="p-5 text-center">
+                                            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${statusColor}`}>
+                                                <StatusIcon size={14} />
+                                                {status}
+                                            </span>
+                                        </td>
+                                        <td className="p-5">
+                                            {sub ? (
+                                                <div className="text-sm">
+                                                    <div className="font-medium text-gray-700 dark:text-gray-300">{sub.duration_days} Days Plan</div>
+                                                    <div className="text-xs text-gray-400">Expires: {expiryDate}</div>
+                                                </div>
+                                            ) : (
+                                                <span className="text-sm text-gray-400 italic">Not subscribed</span>
+                                            )}
+                                        </td>
+                                        <td className="p-5 text-right">
+                                            {sub ? (
+                                                <span className={`font-mono font-bold text-lg ${daysLeft <= 5 ? 'text-red-500' : 'text-gray-700 dark:text-white'}`}>
+                                                    {daysLeft > 0 ? daysLeft : 0}
+                                                </span>
+                                            ) : (
+                                                <span className="text-gray-300">-</span>
+                                            )}
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </div>
       );

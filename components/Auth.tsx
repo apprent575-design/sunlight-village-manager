@@ -4,7 +4,7 @@ import { useApp } from '../context/AppContext';
 import { LogIn, UserPlus, AlertCircle, ArrowRight, Lock, CheckCircle } from 'lucide-react';
 
 export const Auth = () => {
-  const { login, signup, t } = useApp();
+  const { login, signup, t, language } = useApp();
   
   // UI State
   const [isLogin, setIsLogin] = useState(true);
@@ -28,10 +28,11 @@ export const Auth = () => {
         await login(email, password);
       } else {
         await signup(email, password, fullName);
-        // On success, if we are here (no error thrown), it means signup initiated.
-        // For standard Supabase, this means check email.
-        setSuccessMsg("Registration successful! Please check your email to confirm your account before logging in.");
-        setIsLogin(true); // Switch back to login
+        // On success, show confirmation message
+        setSuccessMsg(language === 'ar' 
+            ? "تم إنشاء الحساب بنجاح! يرجى مراجعة بريدك الإلكتروني (بما في ذلك مجلد الرسائل غير المرغوب فيها) لتأكيد وتفعيل الحساب قبل تسجيل الدخول."
+            : "Registration successful! Please check your email (including spam folder) to confirm and activate your account before logging in.");
+        setIsLogin(true); // Switch back to login view
       }
     } catch (err: any) {
       setErrorMsg(err.message || "Authentication failed");
@@ -69,7 +70,7 @@ export const Auth = () => {
         )}
 
         {successMsg && (
-          <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/30 text-green-600 dark:text-green-200 rounded-2xl flex items-start gap-3 text-sm border border-green-100 dark:border-green-800/50 animate-in fade-in slide-in-from-top-2">
+          <div className="mb-6 p-4 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-200 rounded-2xl flex items-start gap-3 text-sm border border-green-100 dark:border-green-800/50 animate-in fade-in slide-in-from-top-2">
             <CheckCircle size={18} className="shrink-0 mt-0.5" />
             <span>{successMsg}</span>
           </div>

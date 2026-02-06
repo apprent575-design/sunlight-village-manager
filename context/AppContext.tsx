@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'; // Import to create temp c
 import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '../lib/supabase';
 import { AppState, Language, Theme, Unit, Booking, Expense, User, BookingStatus, Subscription, Role } from '../types';
 import { MOCK_UNITS, MOCK_BOOKINGS, MOCK_EXPENSES, TRANSLATIONS } from '../constants';
-import { addDays, isAfter, differenceInDays, parseISO } from 'date-fns';
+import { addDays, isAfter, differenceInDays, parseISO, format } from 'date-fns';
 
 interface AppContextType {
   language: Language;
@@ -59,7 +59,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     return (saved === 'dark' || saved === 'light') ? saved : 'light';
   });
 
-  const [user, setUser] = useState<User | null>(null); // Start null, check auth on mount
+  const [user, setUser] = useState<User | null>(null); 
   const [isLoading, setIsLoading] = useState(false);
   
   // App Data State
@@ -102,21 +102,35 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     localStorage.setItem('language', language);
   }, [language]);
 
-  // Auth Initialization & FK Error Prevention
+  // Auth Initialization & Persistence
   useEffect(() => {
       const initAuth = async () => {
           if (supabase) {
-              // REAL MODE: Check active session
+              // 1. Check Active Supabase Session
               const { data: { session } } = await supabase.auth.getSession();
               if (session?.user) {
-                  // Valid session found, fetch full profile
                   await loadUserProfile(session.user.id, session.user.email || '');
               } else {
-                  // No session, clear everything (prevents using stale mock data with real DB)
-                  setUser(null);
-                  setBookings([]);
-                  setUnits([]);
-                  setExpenses([]);
+                  // 2. If no Supabase Session, Check LocalStorage (For Hardcoded Admin Persistence)
+                  const savedUserStr = localStorage.getItem('user');
+                  if (savedUserStr) {
+                      try {
+                          const savedUser = JSON.parse(savedUserStr);
+                          // Only restore if it's the hardcoded admin or a mock user
+                          if (savedUser.id === 'admin-id-123' || savedUser.id.startsWith('mock-')) {
+                              console.log("Restoring session from LocalStorage");
+                              setUser(savedUser);
+                          } else {
+                              // If it's a real user but session is dead, clear it
+                              setUser(null);
+                              localStorage.removeItem('user');
+                          }
+                      } catch (e) {
+                          localStorage.removeItem('user');
+                      }
+                  } else {
+                      setUser(null);
+                  }
               }
           } else {
               // MOCK MODE: Load from local storage
@@ -126,34 +140,100 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
               }
           }
       };
+
       initAuth();
+
+      // 3. Listen for Supabase Auth Changes (e.g. Refresh Token, Sign Out)
+      let authListener: any = null;
+      if (supabase) {
+          const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+              if (event === 'SIGNED_IN' && session?.user) {
+                  await loadUserProfile(session.user.id, session.user.email || '');
+              } else if (event === 'SIGNED_OUT') {
+                  setUser(null);
+                  localStorage.removeItem('user');
+                  setBookings([]);
+                  setUnits([]);
+                  setExpenses([]);
+                  setAllUsers([]);
+              }
+          });
+          authListener = data.subscription;
+      }
+
+      return () => {
+          if (authListener) authListener.unsubscribe();
+      };
   }, []);
 
+  // Fetch Data when User changes
   useEffect(() => {
       if(user) {
           localStorage.setItem('user', JSON.stringify(user));
           fetchData(); 
       } else {
-          localStorage.removeItem('user');
-          setBookings([]);
-          setUnits([]);
-          setExpenses([]);
-          setAllUsers([]);
+         // Cleanup handled in onAuthStateChange usually, but good for safety
       }
   }, [user]);
 
+  // Real-time Subscription Listener
+  useEffect(() => {
+    if (!user || !supabase) return;
+
+    // Listen to changes in the 'subscriptions' table specifically for this user
+    const channel = supabase
+      .channel(`user_subscription_${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen for INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'subscriptions',
+          filter: `user_id=eq.${user.id}`,
+        },
+        (payload) => {
+          console.log('Realtime subscription update:', payload);
+          if (payload.eventType === 'DELETE') {
+             // Subscription removed
+             setUser(prev => prev ? { ...prev, subscription: undefined } : null);
+          } else {
+             // Subscription added or updated (active, paused, etc)
+             const newSub = payload.new as Subscription;
+             setUser(prev => prev ? { ...prev, subscription: newSub } : null);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id]);
+
   const loadUserProfile = async (userId: string, email: string) => {
       if (!supabase) return;
+      
+      // Try fetching profile
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', userId).single();
       const { data: sub } = await supabase.from('subscriptions').select('*').eq('user_id', userId).single();
       
-      setUser({
-          id: userId,
-          email: email,
-          full_name: profile?.full_name,
-          role: profile?.role || 'user',
-          subscription: sub
-      });
+      if (profile) {
+          setUser({
+              id: userId,
+              email: email,
+              full_name: profile.full_name,
+              role: profile.role || 'user',
+              subscription: sub
+          });
+      } else {
+          // Fallback if profile trigger failed or hasn't run yet
+          setUser({
+            id: userId,
+            email: email,
+            role: 'user',
+            full_name: email.split('@')[0]
+          });
+      }
   };
 
   const fetchData = async () => {
@@ -168,6 +248,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
         return;
     }
 
+    // --- Real Supabase User ---
     try {
       if (user.role === 'admin') {
           // Admin: View ALL Data
@@ -207,7 +288,6 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
           if (sRes.data) {
               setUser(prev => prev ? { ...prev, subscription: sRes.data } : null);
           } else {
-              // If subscription was deleted remotely
               setUser(prev => prev ? { ...prev, subscription: undefined } : null);
           }
       }
@@ -221,7 +301,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   // --- Auth Actions ---
 
   const login = async (email: string, password?: string) => {
-    // 1. Hardcoded Admin Check
+    // 1. Hardcoded Admin Check (Only for emergency access, no data injected)
     if (email === 'admin@gmail.com' && password === 'Asd22@33') {
         const adminUser: User = {
             id: 'admin-id-123',
@@ -229,6 +309,8 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
             full_name: 'Super Admin',
             role: 'admin'
         };
+        // Explicitly set LocalStorage here to ensure immediate persistence
+        localStorage.setItem('user', JSON.stringify(adminUser));
         setUser(adminUser);
         return;
     }
@@ -265,9 +347,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     } else {
        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
        if (error) throw error;
-       if (data.session?.user) {
-           await loadUserProfile(data.session.user.id, data.session.user.email!);
-       }
+       // State update happens in onAuthStateChange listener
     }
   };
 
@@ -284,7 +364,12 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
 
   const logout = async () => {
     if (supabase) await supabase.auth.signOut();
+    localStorage.removeItem('user');
     setUser(null);
+    setBookings([]);
+    setUnits([]);
+    setExpenses([]);
+    setAllUsers([]);
   };
 
   const updatePassword = async (password: string) => {
@@ -292,22 +377,32 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       await supabase.auth.updateUser({ password });
   };
 
-  // --- Admin Specific Actions ---
+  // --- Admin Specific Actions (With Local State Updates) ---
 
   const addAccount = async (email: string, password: string, fullName: string) => {
-      // Mock logic...
       if (!supabase) return; 
-      // Supabase logic is handled in component mostly or here if needed, keeping simple
+      // Logic handled in component typically
   };
   
   const deleteAccount = async (id: string) => {
-      // ... same as before
+      if(user?.id === 'admin-id-123') {
+          // Mock delete for hardcoded admin
+          setAllUsers(prev => prev.filter(u => u.id !== id));
+          return;
+      }
       if (!supabase) return;
       const { error: rpcError } = await supabase.rpc('delete_user_by_id', { target_user_id: id });
       if (rpcError) throw rpcError;
+      setAllUsers(prev => prev.filter(u => u.id !== id));
   };
 
   const addSubscription = async (subscription: Subscription) => {
+      if (user?.id === 'admin-id-123') {
+          // Mock add
+          setAllUsers(prev => prev.map(u => u.id === subscription.user_id ? { ...u, subscription } : u));
+          return;
+      }
+
       if (!supabase) {
           setAllUsers(prev => prev.map(u => u.id === subscription.user_id ? { ...u, subscription } : u));
           return;
@@ -323,6 +418,12 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
 
   const deleteSubscription = async (id: string) => {
       const userId = allUsers.find(u => u.subscription?.id === id)?.id;
+      
+      if(user?.id === 'admin-id-123') {
+          if (userId) setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, subscription: undefined } : u));
+          return;
+      }
+
       if (!supabase) {
           if (userId) setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, subscription: undefined } : u));
           return;
@@ -337,21 +438,18 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   const checkRestriction = () => {
       if (isAdmin) return; // Admins bypass
 
-      // 1. Subscription Existence
       if (!subExists) {
            throw new Error(language === 'ar' 
             ? 'غير مسموح. أنت غير مشترك في الخدمة. يرجى الاشتراك للتمكن من إضافة البيانات.' 
             : 'Access Denied. You do not have a subscription. Please subscribe to add data.');
       }
       
-      // 2. Subscription Paused
       if (user?.subscription?.status === 'paused') {
           throw new Error(language === 'ar' 
             ? 'اشتراكك موقوف مؤقتاً من قبل الإدارة. لا يمكنك إضافة بيانات جديدة.' 
             : 'Your subscription is paused by the admin. You cannot add new data.');
       }
 
-      // 3. Subscription Validity (Date)
       if (!hasValidSubscription) {
           throw new Error(language === 'ar' 
             ? 'عفواً، انتهت صلاحية اشتراكك. يرجى تجديد الاشتراك لإضافة بيانات جديدة.' 
@@ -363,7 +461,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     checkRestriction();
     if (!user) throw new Error("User not authenticated");
     
-    booking.user_id = user.id; // Enforce correct user_id
+    booking.user_id = user.id; 
     
     if (!supabase) { setBookings(prev => [booking, ...prev]); return; }
     
@@ -376,8 +474,6 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   };
 
   const updateBooking = async (updated: Booking) => {
-    // Only allow editing if subscription is valid? Usually editing is allowed, but adding is restricted.
-    // Let's allow edit/delete for maintenance, but restrict ADD.
     if (!supabase) { setBookings(prev => prev.map(b => b.id === updated.id ? updated : b)); return; }
     
     setBookings(prev => prev.map(b => b.id === updated.id ? updated : b));
@@ -397,7 +493,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       checkRestriction(); 
       if (!user) throw new Error("User not authenticated");
 
-      unit.user_id = user.id; // Enforce correct user_id to fix FK error
+      unit.user_id = user.id; 
       
       if(!supabase) { setUnits(prev => [...prev, unit]); return; }
       
