@@ -1,15 +1,22 @@
+
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Moon, Sun, Globe, Shield, User, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { Moon, Sun, Globe, Shield, User, Check, AlertCircle, Loader2, CreditCard, Clock, Calendar } from 'lucide-react';
+import { format, addDays, parseISO } from 'date-fns';
 
 export const Settings = () => {
-  const { t, theme, toggleTheme, language, setLanguage, updatePassword, user } = useApp();
+  const { t, theme, toggleTheme, language, setLanguage, updatePassword, user, hasValidSubscription, daysRemaining, isAdmin } = useApp();
   
   // Password Change State
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isChangingPass, setIsChangingPass] = useState(false);
   const [passMessage, setPassMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+  // Subscription Info
+  const sub = user?.subscription;
+  const endDate = sub ? addDays(parseISO(sub.start_date), sub.duration_days) : null;
+  const isPaused = sub?.status === 'paused';
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,19 +70,81 @@ export const Settings = () => {
                     {user?.email}
                 </p>
                 <div className="mt-8 flex gap-2">
-                    <span className="px-4 py-1.5 bg-green-100 text-green-700 text-xs font-bold rounded-full border border-green-200 dark:bg-green-900/30 dark:text-green-400 dark:border-green-800">
-                        Active Account
-                    </span>
-                    <span className="px-4 py-1.5 bg-blue-100 text-blue-700 text-xs font-bold rounded-full border border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800">
-                        Admin
-                    </span>
+                    {isAdmin ? (
+                        <span className="px-4 py-1.5 bg-purple-100 text-purple-700 text-xs font-bold rounded-full border border-purple-200">
+                            Admin Access
+                        </span>
+                    ) : (
+                        <span className="px-4 py-1.5 bg-blue-100 text-blue-700 text-xs font-bold rounded-full border border-blue-200">
+                            User Account
+                        </span>
+                    )}
                 </div>
             </div>
         </div>
 
+        {/* Subscription Status Card (Visible for Non-Admins) */}
+        {!isAdmin && (
+            <div className="glass p-8 rounded-3xl relative overflow-hidden flex flex-col justify-between">
+                <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                    <CreditCard size={140} />
+                </div>
+                
+                <div>
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className={`p-3 rounded-2xl ${hasValidSubscription ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                            {hasValidSubscription ? <Check size={24} /> : <AlertCircle size={24} />}
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-gray-800 dark:text-white text-lg">{t('subscriptionStatus')}</h3>
+                            <p className={`text-sm font-bold ${hasValidSubscription ? 'text-green-600' : 'text-red-500'}`}>
+                                {isPaused ? t('paused') : hasValidSubscription ? t('active') : t('expired')}
+                            </p>
+                        </div>
+                    </div>
+
+                    {sub ? (
+                        <div className="space-y-4">
+                            <div className="bg-white/50 dark:bg-slate-800/50 p-4 rounded-2xl border border-gray-100 dark:border-gray-700">
+                                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 mb-1">
+                                    <Clock size={16} />
+                                    <span>{t('daysRemaining')}</span>
+                                </div>
+                                <div className="text-3xl font-black text-gray-800 dark:text-white">
+                                    {daysRemaining} <span className="text-sm font-medium text-gray-400">{t('days')}</span>
+                                </div>
+                                <div className="w-full bg-gray-200 dark:bg-gray-700 h-1.5 rounded-full mt-3 overflow-hidden">
+                                    <div 
+                                        className={`h-full rounded-full transition-all duration-500 ${daysRemaining < 5 ? 'bg-red-500' : 'bg-primary-500'}`} 
+                                        style={{ width: `${Math.min((daysRemaining / sub.duration_days) * 100, 100)}%` }}
+                                    ></div>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-between text-sm">
+                                <div className="flex flex-col">
+                                    <span className="text-gray-400 text-xs font-bold uppercase">{t('startDate')}</span>
+                                    <span className="font-bold dark:text-gray-200">{sub.start_date}</span>
+                                </div>
+                                <div className="flex flex-col text-right">
+                                    <span className="text-gray-400 text-xs font-bold uppercase">Ends On</span>
+                                    <span className="font-bold dark:text-gray-200">{endDate ? format(endDate, 'yyyy-MM-dd') : '-'}</span>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                         <div className="text-center py-6">
+                            <p className="text-gray-500 mb-4">You do not have an active subscription plan.</p>
+                            <span className="inline-block px-4 py-2 bg-gray-100 rounded-lg text-xs font-bold text-gray-600">Contact Admin</span>
+                         </div>
+                    )}
+                </div>
+            </div>
+        )}
+
         {/* Appearance Card */}
         <div className="glass p-8 rounded-3xl flex flex-col justify-center space-y-8">
-             {/* Theme Toggle - PRESERVED RTL FIX */}
+             {/* Theme Toggle */}
              <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                     <div className="p-3 bg-orange-100 dark:bg-slate-700 text-orange-600 dark:text-orange-400 rounded-2xl shadow-sm">
@@ -87,7 +156,6 @@ export const Settings = () => {
                     </div>
                 </div>
                 
-                {/* Fixed Toggle for RTL */}
                 <button 
                   onClick={toggleTheme}
                   dir="ltr"
