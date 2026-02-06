@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
@@ -13,15 +14,18 @@ import {
   Home,
   LogOut,
   Sun,
-  Moon
+  Moon,
+  Users,
+  CreditCard,
+  FileText
 } from 'lucide-react';
 
 export const Layout = ({ children }: { children?: React.ReactNode }) => {
-  const { t, theme, toggleTheme, language, setLanguage, logout, isRTL } = useApp();
+  const { t, theme, toggleTheme, language, setLanguage, logout, isRTL, isAdmin, user } = useApp();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const navItems = [
+  const userNavItems = [
     { path: '/', icon: LayoutDashboard, label: t('dashboard') },
     { path: '/bookings', icon: BookOpen, label: t('bookings') },
     { path: '/calendar', icon: Calendar, label: t('calendar') },
@@ -30,6 +34,16 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
     { path: '/units', icon: Home, label: t('units') },
     { path: '/settings', icon: Settings, label: t('settings') },
   ];
+
+  const adminNavItems = [
+    { path: '/admin/dashboard', icon: LayoutDashboard, label: t('adminDashboard') },
+    { path: '/admin/accounts', icon: Users, label: t('accounts') },
+    { path: '/admin/subscriptions', icon: CreditCard, label: t('subscriptions') },
+    { path: '/admin/reports', icon: FileText, label: t('reports') },
+    { path: '/settings', icon: Settings, label: t('settings') },
+  ];
+
+  const navItems = isAdmin ? adminNavItems : userNavItems;
 
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
@@ -56,7 +70,9 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
               <h1 className="text-3xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-brand-accent tracking-tight">
                 Sunlight
               </h1>
-              <span className="text-xs font-bold text-gray-400 tracking-widest uppercase ml-0.5">Village Manager</span>
+              <span className="text-xs font-bold text-gray-400 tracking-widest uppercase ml-0.5">
+                {isAdmin ? 'Super Admin' : 'Village Manager'}
+              </span>
           </div>
           <button onClick={toggleSidebar} className="md:hidden text-gray-500 hover:text-gray-800 transition-colors">
             <X size={24} />

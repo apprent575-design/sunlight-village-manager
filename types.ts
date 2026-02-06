@@ -1,3 +1,4 @@
+
 export enum UnitType {
   CHALET = 'Chalet',
   VILLA = 'Villa',
@@ -17,6 +18,7 @@ export enum PaymentStatus {
 
 export interface Unit {
   id: string;
+  user_id?: string; // Owner
   name: string;
   type: UnitType;
   created_at: string;
@@ -24,6 +26,7 @@ export interface Unit {
 
 export interface Booking {
   id: string;
+  user_id?: string; // Owner
   tenant_name: string;
   phone: string;
   start_date: string; // ISO Date string
@@ -46,6 +49,7 @@ export interface Booking {
 
 export interface Expense {
   id: string;
+  user_id?: string; // Owner
   unit_id: string;
   title: string;
   category: string;
@@ -55,10 +59,24 @@ export interface Expense {
   created_at: string;
 }
 
+export type Role = 'admin' | 'user';
+
+export interface Subscription {
+  id: string;
+  user_id: string;
+  start_date: string;
+  duration_days: number;
+  price: number;
+  status: 'active' | 'expired' | 'paused';
+}
+
 export interface User {
   id: string;
   email: string;
   full_name?: string;
+  role: Role;
+  phone?: string;
+  subscription?: Subscription;
 }
 
 export type Language = 'en' | 'ar';
@@ -68,4 +86,6 @@ export interface AppState {
   units: Unit[];
   bookings: Booking[];
   expenses: Expense[];
+  // Admin Data
+  allUsers: User[]; 
 }

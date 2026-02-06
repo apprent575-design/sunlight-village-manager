@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { UnitType, Unit } from '../types';
@@ -8,33 +9,40 @@ export const Units = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [unitToDelete, setUnitToDelete] = useState<Unit | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   
   // Form State
   const [name, setName] = useState('');
   const [type, setType] = useState<UnitType>(UnitType.CHALET);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name) return;
+    setErrorMsg(null);
 
-    if (editingId) {
-      const existing = state.units.find(u => u.id === editingId);
-      if (existing) {
-        updateUnit({ ...existing, name, type });
-        setEditingId(null);
-      }
-    } else {
-      addUnit({
-        id: crypto.randomUUID(),
-        name,
-        type,
-        created_at: new Date().toISOString()
-      });
+    try {
+        if (editingId) {
+          const existing = state.units.find(u => u.id === editingId);
+          if (existing) {
+            await updateUnit({ ...existing, name, type });
+            setEditingId(null);
+          }
+        } else {
+          await addUnit({
+            id: crypto.randomUUID(),
+            name,
+            type,
+            created_at: new Date().toISOString()
+          });
+        }
+        setName('');
+    } catch (error: any) {
+        setErrorMsg(error.message || 'Failed to add unit. Please check subscription.');
     }
-    setName('');
   };
 
   const startEdit = (unit: Unit) => {
+    setErrorMsg(null);
     setEditingId(unit.id);
     setName(unit.name);
     setType(unit.type);
@@ -44,6 +52,7 @@ export const Units = () => {
     setEditingId(null);
     setName('');
     setType(UnitType.CHALET);
+    setErrorMsg(null);
   };
 
   const handleDeleteClick = (e: React.MouseEvent, unit: Unit) => {
@@ -74,6 +83,15 @@ export const Units = () => {
           <h3 className="text-xl font-bold mb-4 dark:text-white">
             {editingId ? t('editUnit') : t('addUnit')}
           </h3>
+          
+          {/* Error Message Display */}
+          {errorMsg && (
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-200 text-sm rounded-xl border border-red-100 dark:border-red-800/50 flex items-start gap-2 animate-in slide-in-from-top-2">
+                  <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                  <span>{errorMsg}</span>
+              </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-1 dark:text-gray-300">{t('unitName')}</label>

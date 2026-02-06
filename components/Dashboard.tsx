@@ -1,7 +1,8 @@
+
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { Calendar, DollarSign, TrendingUp, Users, Clock } from 'lucide-react';
-import { format, isValid } from 'date-fns';
+import { Calendar, DollarSign, TrendingUp, Users, Clock, CreditCard, Activity, AlertCircle } from 'lucide-react';
+import { format, isValid, addDays, parseISO, isAfter } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 
 const StatCard = ({ title, value, icon: Icon, gradient, trend }: any) => (
@@ -31,9 +32,96 @@ const StatCard = ({ title, value, icon: Icon, gradient, trend }: any) => (
 );
 
 export const Dashboard = () => {
-  const { t, state, user } = useApp();
+  const { t, state, user, isAdmin } = useApp();
   const navigate = useNavigate();
 
+  // Helper icon component for Admin dash
+  const CheckCircle = ({size, strokeWidth}: any) => <Activity size={size} strokeWidth={strokeWidth} />;
+
+  // --- ADMIN LOGIC (Subscription Focused) ---
+  if (isAdmin) {
+      const allClients = state.allUsers.filter(u => u.role !== 'admin');
+      
+      const activeSubs = allClients.filter(u => {
+          if (!u.subscription) return false;
+          const end = addDays(parseISO(u.subscription.start_date), u.subscription.duration_days);
+          return isAfter(end, new Date());
+      }).length;
+
+      const expiredSubs = allClients.filter(u => {
+          if (!u.subscription) return false;
+          const end = addDays(parseISO(u.subscription.start_date), u.subscription.duration_days);
+          return !isAfter(end, new Date());
+      }).length;
+
+      const totalRevenue = allClients.reduce((sum, u) => sum + (u.subscription?.price || 0), 0);
+      
+      return (
+        <div className="space-y-8">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                    <h2 className="text-4xl font-extrabold text-gray-800 dark:text-white tracking-tight">
+                        {t('adminDashboard')}
+                    </h2>
+                    <p className="text-gray-500 dark:text-gray-400 mt-2 text-lg">
+                        Subscription & Client Overview
+                    </p>
+                </div>
+                <div className="text-sm font-medium text-gray-400 bg-white/60 dark:bg-slate-800/60 px-5 py-2.5 rounded-2xl border border-white dark:border-gray-700 shadow-sm backdrop-blur-sm">
+                    {format(new Date(), 'EEEE, d MMMM yyyy')}
+                </div>
+            </div>
+
+            {/* Admin Stats */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <StatCard 
+                    title="Total Clients" 
+                    value={allClients.length} 
+                    icon={Users} 
+                    gradient="bg-gradient-to-br from-blue-500 to-blue-700"
+                />
+                <StatCard 
+                    title="Active Subscriptions" 
+                    value={activeSubs} 
+                    icon={CheckCircle} 
+                    gradient="bg-gradient-to-br from-emerald-500 to-teal-600"
+                    trend
+                />
+                <StatCard 
+                    title="Expired / Inactive" 
+                    value={expiredSubs + (allClients.length - activeSubs - expiredSubs)} 
+                    icon={AlertCircle} 
+                    gradient="bg-gradient-to-br from-orange-400 to-red-500"
+                />
+                <StatCard 
+                    title="Total Sub Revenue" 
+                    value={`${totalRevenue.toLocaleString()} EGP`} 
+                    icon={DollarSign} 
+                    gradient="bg-gradient-to-br from-purple-500 to-indigo-600"
+                />
+            </div>
+             
+             {/* Admin Quick Action */}
+            <div className="glass p-8 rounded-3xl border border-white/50 dark:border-white/5 text-center space-y-4">
+                <div className="p-4 bg-primary-100 dark:bg-slate-800 w-fit mx-auto rounded-full text-primary-600 dark:text-primary-400">
+                    <CreditCard size={32} />
+                </div>
+                <h3 className="text-2xl font-bold text-gray-800 dark:text-white">Manage Subscriptions</h3>
+                <p className="text-gray-500 max-w-md mx-auto">View all client statuses, renew subscriptions, or add new accounts.</p>
+                <button 
+                    onClick={() => navigate('/admin/subscriptions')}
+                    className="px-6 py-3 bg-primary-600 hover:bg-primary-700 text-white font-bold rounded-xl shadow-lg transition-transform hover:scale-105"
+                >
+                    Go to Subscriptions
+                </button>
+            </div>
+        </div>
+      );
+  }
+
+  // --- USER LOGIC (Rental Focused) ---
+  // Reusing previous logic for normal users
+  
   const activeBookings = state.bookings.filter(b => b.status === 'Confirmed' || b.status === 'Pending').length;
   
   // Calculate Net Profit
@@ -53,7 +141,7 @@ export const Dashboard = () => {
     const d = new Date(dateStr);
     return isValid(d) ? format(d, 'MMM dd') : 'Invalid';
   };
-
+  
   return (
     <div className="space-y-8">
       {/* Welcome Header */}
@@ -63,7 +151,7 @@ export const Dashboard = () => {
                 {t('dashboard')}
             </h2>
             <p className="text-gray-500 dark:text-gray-400 mt-2 text-lg">
-                Welcome back, <span className="text-primary-600 dark:text-primary-400 font-bold">{user?.full_name || 'Admin'}</span> 👋
+                Welcome back, <span className="text-primary-600 dark:text-primary-400 font-bold">{user?.full_name}</span> 👋
             </p>
         </div>
         <div className="text-sm font-medium text-gray-400 bg-white/60 dark:bg-slate-800/60 px-5 py-2.5 rounded-2xl border border-white dark:border-gray-700 shadow-sm backdrop-blur-sm">

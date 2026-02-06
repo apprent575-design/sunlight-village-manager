@@ -1,8 +1,9 @@
+
 import { createClient } from '@supabase/supabase-js';
 
 // --- CONFIGURATION ---
-const SUPABASE_URL = 'https://nvnykdzmshpwcevipkdl.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im52bnlrZHptc2hwd2Nldmlwa2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMzg3MTMsImV4cCI6MjA4NTgxNDcxM30.wRhhTppNxyFA_eR8atNhc9DG38A4Eg381gYAzfnn88w';
+export const SUPABASE_URL = 'https://nvnykdzmshpwcevipkdl.supabase.co';
+export const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im52bnlrZHptc2hwd2Nldmlwa2RsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyMzg3MTMsImV4cCI6MjA4NTgxNDcxM30.wRhhTppNxyFA_eR8atNhc9DG38A4Eg381gYAzfnn88w';
 
 // Check if keys are valid
 const isConfigured = SUPABASE_URL && SUPABASE_ANON_KEY;

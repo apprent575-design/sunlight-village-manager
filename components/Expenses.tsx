@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Expense } from '../types';
@@ -9,6 +10,7 @@ export const Expenses = () => {
   const { t, state, addExpense, updateExpense, deleteExpense, language } = useApp();
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   
   // Delete State
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
@@ -43,23 +45,29 @@ export const Expenses = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingId) {
-        await updateExpense({
-            ...expenseData,
-            id: editingId,
-            created_at: state.expenses.find(ex => ex.id === editingId)?.created_at || new Date().toISOString()
-        } as Expense);
-    } else {
-        await addExpense({
-            ...expenseData,
-            id: crypto.randomUUID(),
-            created_at: new Date().toISOString()
-        } as Expense);
+    setErrorMsg(null);
+    try {
+        if (editingId) {
+            await updateExpense({
+                ...expenseData,
+                id: editingId,
+                created_at: state.expenses.find(ex => ex.id === editingId)?.created_at || new Date().toISOString()
+            } as Expense);
+        } else {
+            await addExpense({
+                ...expenseData,
+                id: crypto.randomUUID(),
+                created_at: new Date().toISOString()
+            } as Expense);
+        }
+        closeForm();
+    } catch (error: any) {
+        setErrorMsg(error.message || 'Failed to save expense. Please check your subscription.');
     }
-    closeForm();
   };
 
   const handleEdit = (expense: Expense) => {
+    setErrorMsg(null);
     setEditingId(expense.id);
     setExpenseData({
         title: expense.title,
@@ -90,6 +98,7 @@ export const Expenses = () => {
   const closeForm = () => {
     setShowAdd(false);
     setEditingId(null);
+    setErrorMsg(null);
     setExpenseData({
         title: '',
         amount: 0,
@@ -155,6 +164,14 @@ export const Expenses = () => {
               <h3 className="font-bold text-lg dark:text-white">{editingId ? 'Edit Expense' : t('addExpense')}</h3>
               <button type="button" onClick={closeForm} className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-slate-700"><X size={18}/></button>
           </div>
+
+          {errorMsg && (
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-200 text-sm rounded-xl border border-red-100 dark:border-red-800/50 flex items-start gap-2">
+                  <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+                  <span>{errorMsg}</span>
+              </div>
+          )}
+
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
             <div className="space-y-1">
               <label className="text-xs font-bold text-gray-500 uppercase">Title</label>

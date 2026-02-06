@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useApp } from '../context/AppContext';
 import { FileText, Download } from 'lucide-react';
@@ -12,13 +13,13 @@ export const Reports = () => {
       <h2 className="text-3xl font-bold text-gray-800 dark:text-white">{t('reports')}</h2>
       
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="glass p-6 rounded-2xl flex flex-col justify-between h-48">
+        <div className="glass p-6 rounded-2xl flex flex-col justify-between h-auto min-h-[12rem]">
           <div>
              <div className="p-3 bg-blue-100 dark:bg-blue-900 w-fit rounded-lg mb-4">
                 <FileText className="text-blue-600 dark:text-blue-300" size={24} />
              </div>
              <h3 className="text-xl font-bold dark:text-white">{t('financialSummary')}</h3>
-             <p className="text-gray-500 text-sm">{t('financialSummaryDesc')}</p>
+             <p className="text-gray-500 text-sm mt-1 mb-4">{t('financialSummaryDesc')}</p>
           </div>
           <button 
             onClick={() => generateFinancialReport(state.units, state.bookings, state.expenses, language, t)}
@@ -28,13 +29,13 @@ export const Reports = () => {
           </button>
         </div>
 
-        <div className="glass p-6 rounded-2xl flex flex-col justify-between h-48">
+        <div className="glass p-6 rounded-2xl flex flex-col justify-between h-auto min-h-[12rem]">
           <div>
              <div className="p-3 bg-purple-100 dark:bg-purple-900 w-fit rounded-lg mb-4">
                 <FileText className="text-purple-600 dark:text-purple-300" size={24} />
              </div>
              <h3 className="text-xl font-bold dark:text-white">{t('occupancyReport')}</h3>
-             <p className="text-gray-500 text-sm">{t('occupancyReportDesc')}</p>
+             <p className="text-gray-500 text-sm mt-1 mb-4">{t('occupancyReportDesc')}</p>
           </div>
           <button 
              onClick={() => generateOccupancyReport(state.units, state.bookings, language, t)}
