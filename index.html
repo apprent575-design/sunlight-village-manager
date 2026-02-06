@@ -120,6 +120,15 @@
       .dark .rbc-today {
         background-color: rgba(59, 130, 246, 0.1) !important;
       }
+
+      /* Hide Scrollbar but allow scrolling */
+      .no-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .no-scrollbar {
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
+      }
     </style>
   <script type="importmap">
 {

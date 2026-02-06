@@ -2,6 +2,7 @@ import React from 'react';
 import { useApp } from '../context/AppContext';
 import { Calendar, DollarSign, TrendingUp, Users, Clock } from 'lucide-react';
 import { format, isValid } from 'date-fns';
+import { useNavigate } from 'react-router-dom';
 
 const StatCard = ({ title, value, icon: Icon, gradient, trend }: any) => (
   <div className={`relative overflow-hidden rounded-3xl p-6 shadow-lg transition-all hover:-translate-y-1 hover:shadow-xl border border-white/20 ${gradient}`}>
@@ -31,6 +32,7 @@ const StatCard = ({ title, value, icon: Icon, gradient, trend }: any) => (
 
 export const Dashboard = () => {
   const { t, state, user } = useApp();
+  const navigate = useNavigate();
 
   const activeBookings = state.bookings.filter(b => b.status === 'Confirmed' || b.status === 'Pending').length;
   
@@ -101,10 +103,15 @@ export const Dashboard = () => {
                 </div>
                 <h3 className="text-xl font-bold text-gray-800 dark:text-white">{t('rentalOverview')}</h3>
             </div>
-            <button className="text-sm font-bold text-primary-600 hover:text-primary-700 transition-colors bg-primary-50 dark:bg-primary-900/10 px-4 py-2 rounded-xl">View All</button>
+            <button 
+              onClick={() => navigate('/bookings')}
+              className="text-sm font-bold text-primary-600 hover:text-primary-700 transition-colors bg-primary-50 dark:bg-primary-900/10 px-4 py-2 rounded-xl"
+            >
+              View All
+            </button>
         </div>
         
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto no-scrollbar">
           <table className="w-full text-left">
             <thead className="bg-gray-50/80 dark:bg-slate-800/80 backdrop-blur-sm">
               <tr>

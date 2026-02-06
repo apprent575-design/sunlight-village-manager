@@ -202,8 +202,9 @@ export const Expenses = () => {
         </form>
       )}
 
-      <div className="glass rounded-2xl overflow-hidden">
-        <table className="w-full text-left dark:text-gray-300">
+      {/* Added overflow-x-auto for mobile horizontal scrolling */}
+      <div className="glass rounded-2xl overflow-hidden overflow-x-auto no-scrollbar">
+        <table className="w-full text-left dark:text-gray-300 whitespace-nowrap md:whitespace-normal">
           <thead className="bg-gray-100/50 dark:bg-slate-800/50 border-b border-gray-200 dark:border-gray-700">
             <tr>
               <th className="p-4">{t('date')}</th>
@@ -228,7 +229,8 @@ export const Expenses = () => {
                     </span>
                 </td>
                 <td className="p-4 text-right font-mono text-red-500">-{expense.amount} {t('currency')}</td>
-                <td className="p-4 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                {/* Removed opacity classes to make buttons always visible */}
+                <td className="p-4 flex items-center justify-center gap-2 transition-opacity">
                     <button 
                         onClick={() => handleEdit(expense)}
                         className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
