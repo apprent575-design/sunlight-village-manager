@@ -346,7 +346,17 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
         if (supabase) await (supabase as any).auth.signOut();
     } catch (e) {
         console.error("Logout error", e);
-    } 
+    } finally {
+        // FORCE UI RESET (Handles 403 Forbidden or already logged out cases)
+        setUser(null);
+        setUnits([]);
+        setBookings([]);
+        setExpenses([]);
+        setAllUsers([]);
+        setIsLoading(false);
+        // Clear potential sticky keys (optional)
+        localStorage.removeItem('sb-nvnykdzmshpwcevipkdl-auth-token'); 
+    }
   };
 
   const updatePassword = async (password: string) => {
