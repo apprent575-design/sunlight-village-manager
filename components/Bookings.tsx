@@ -401,7 +401,9 @@ export const Bookings = () => {
                         value={formData.status}
                         onChange={e => setFormData({...formData, status: e.target.value as BookingStatus})}
                        >
-                         {Object.values(BookingStatus).map(s => <option key={s} value={s}>{s}</option>)}
+                         {Object.values(BookingStatus).map(s => (
+                            <option key={s} value={s}>{t(s.toLowerCase() as any)}</option>
+                         ))}
                        </select>
                   </div>
                   
