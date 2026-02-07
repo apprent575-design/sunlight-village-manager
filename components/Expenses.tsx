@@ -3,11 +3,11 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Expense } from '../types';
 import { Plus, Download, Calendar, Edit2, Trash2, Check, X, AlertTriangle, Loader2 } from 'lucide-react';
-import { format, isWithinInterval, isValid } from 'date-fns';
+import { format, isWithinInterval, isValid, startOfMonth, endOfMonth } from 'date-fns';
 import { generateExpenseReport } from '../utils/pdfGenerator';
 
 export const Expenses = () => {
-  const { t, state, addExpense, updateExpense, deleteExpense, language } = useApp();
+  const { t, state, addExpense, updateExpense, deleteExpense, language, isRTL } = useApp();
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -16,10 +16,10 @@ export const Expenses = () => {
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   
-  // Filters
+  // Filters - Default to Current Month
   const [filterUnit, setFilterUnit] = useState<string>('all');
-  const [filterStart, setFilterStart] = useState('');
-  const [filterEnd, setFilterEnd] = useState('');
+  const [filterStart, setFilterStart] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
+  const [filterEnd, setFilterEnd] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
   
   const [expenseData, setExpenseData] = useState<Partial<Expense>>({
     title: '',
@@ -29,6 +29,17 @@ export const Expenses = () => {
     unit_id: state.units[0]?.id || ''
   });
 
+  const expenseCategories = [
+    'Maintenance',
+    'Electricity',
+    'Water',
+    'Internet',
+    'Gas',
+    'Cleaning Supplies',
+    'Furniture',
+    'Other'
+  ];
+
   const filteredExpenses = state.expenses.filter(e => {
     const matchesUnit = filterUnit === 'all' || e.unit_id === filterUnit;
     let matchesDate = true;
@@ -37,7 +48,10 @@ export const Expenses = () => {
       const start = new Date(filterStart);
       const end = new Date(filterEnd);
       if (isValid(d) && isValid(start) && isValid(end)) {
-          matchesDate = isWithinInterval(d, { start, end });
+          // Check inclusion (start <= date <= end)
+          matchesDate = isWithinInterval(d, { start, end }) || 
+                        (d.getTime() === start.getTime()) || 
+                        (d.getTime() === end.getTime());
       }
     }
     return matchesUnit && matchesDate;
@@ -108,6 +122,9 @@ export const Expenses = () => {
     });
   };
 
+  // Shared Input Style
+  const inputStyle = "w-full p-3 rounded-xl border border-gray-300 bg-white text-gray-900 focus:ring-2 focus:ring-primary-500 outline-none transition-all dark:bg-slate-800 dark:border-gray-600 dark:text-white";
+
   return (
     <div className="space-y-6 relative">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -122,7 +139,7 @@ export const Expenses = () => {
                     value={filterStart}
                     onChange={(e) => setFilterStart(e.target.value)}
                 />
-                <span className="text-gray-400">→</span>
+                <span className="text-gray-400 font-bold">{isRTL ? '←' : '→'}</span>
                 <input 
                     type="date" 
                     className="bg-transparent outline-none text-sm dark:text-gray-300 w-28" 
@@ -141,7 +158,7 @@ export const Expenses = () => {
            </select>
            
            <button 
-             onClick={() => generateExpenseReport(filteredExpenses, state.units, language, t)}
+             onClick={() => generateExpenseReport(state.expenses, state.units, language, t, filterStart, filterEnd, filterUnit)}
              className="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-xl flex items-center justify-center gap-2 shadow-lg"
            >
              <Download size={18} />
@@ -174,39 +191,36 @@ export const Expenses = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
             <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-500 uppercase">Title</label>
-              <input required type="text" className="w-full p-2 rounded-lg border dark:bg-slate-800 dark:border-gray-700" value={expenseData.title} onChange={e => setExpenseData({...expenseData, title: e.target.value})} />
+              <label className="text-xs font-bold text-gray-500 uppercase">{t('title')}</label>
+              <input required type="text" className={inputStyle} value={expenseData.title} onChange={e => setExpenseData({...expenseData, title: e.target.value})} />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-bold text-gray-500 uppercase">{t('category')}</label>
               <select 
-                className="w-full p-2 rounded-lg border dark:bg-slate-800 dark:border-gray-700"
+                className={inputStyle}
                 value={expenseData.category} 
                 onChange={e => setExpenseData({...expenseData, category: e.target.value})}
               >
-                <option value="Maintenance">Maintenance</option>
-                <option value="Electricity">Electricity</option>
-                <option value="Water">Water</option>
-                <option value="Internet">Internet</option>
-                <option value="Gas">Gas</option>
-                <option value="Cleaning Supplies">Cleaning Supplies</option>
-                <option value="Furniture">Furniture</option>
-                <option value="Other">Other</option>
+                {expenseCategories.map(cat => (
+                    <option key={cat} value={cat}>
+                        {t(cat.toLowerCase().replace(' ', '_') as any)}
+                    </option>
+                ))}
               </select>
             </div>
             <div className="space-y-1">
               <label className="text-xs font-bold text-gray-500 uppercase">{t('amount')} ({t('currency')})</label>
-              <input required type="number" className="w-full p-2 rounded-lg border dark:bg-slate-800 dark:border-gray-700" value={expenseData.amount} onChange={e => setExpenseData({...expenseData, amount: parseFloat(e.target.value)})} />
+              <input required type="number" className={inputStyle} value={expenseData.amount} onChange={e => setExpenseData({...expenseData, amount: parseFloat(e.target.value)})} />
             </div>
              <div className="space-y-1">
               <label className="text-xs font-bold text-gray-500 uppercase">{t('unit')}</label>
-              <select className="w-full p-2 rounded-lg border dark:bg-slate-800 dark:border-gray-700" value={expenseData.unit_id} onChange={e => setExpenseData({...expenseData, unit_id: e.target.value})}>
+              <select className={inputStyle} value={expenseData.unit_id} onChange={e => setExpenseData({...expenseData, unit_id: e.target.value})}>
                 {state.units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             </div>
              <div className="space-y-1">
               <label className="text-xs font-bold text-gray-500 uppercase">{t('date')}</label>
-              <input required type="date" className="w-full p-2 rounded-lg border dark:bg-slate-800 dark:border-gray-700" value={expenseData.date} onChange={e => setExpenseData({...expenseData, date: e.target.value})} />
+              <input required type="date" className={inputStyle} value={expenseData.date} onChange={e => setExpenseData({...expenseData, date: e.target.value})} />
             </div>
           </div>
           <div className="mt-4 flex justify-end gap-2">
@@ -226,7 +240,7 @@ export const Expenses = () => {
             <tr>
               <th className="p-4">{t('date')}</th>
               <th className="p-4">{t('unit')}</th>
-              <th className="p-4">Title</th>
+              <th className="p-4">{t('title')}</th>
               <th className="p-4">{t('category')}</th>
               <th className="p-4 text-right">{t('amount')}</th>
               <th className="p-4 text-center w-24">{t('actions')}</th>
@@ -242,7 +256,7 @@ export const Expenses = () => {
                 <td className="p-4 font-medium">{expense.title}</td>
                 <td className="p-4 text-sm text-gray-500">
                     <span className="bg-gray-100 dark:bg-slate-700 px-2 py-1 rounded text-xs">
-                        {expense.category || 'Maintenance'}
+                        {t(expense.category.toLowerCase().replace(' ', '_') as any) || expense.category}
                     </span>
                 </td>
                 <td className="p-4 text-right font-mono text-red-500">-{expense.amount} {t('currency')}</td>

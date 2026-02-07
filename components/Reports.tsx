@@ -6,7 +6,7 @@ import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { generateFinancialReport, generateOccupancyReport, generateVillageFeesReport } from '../utils/pdfGenerator';
 
 export const Reports = () => {
-  const { t, state, language } = useApp();
+  const { t, state, language, isRTL } = useApp();
   
   // Filters
   const [filterStart, setFilterStart] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
@@ -30,7 +30,7 @@ export const Reports = () => {
                 value={filterStart}
                 onChange={(e) => setFilterStart(e.target.value)}
             />
-            <span className="text-gray-400">→</span>
+            <span className="text-gray-400 font-bold">{isRTL ? '←' : '→'}</span>
             <input 
                 type="date" 
                 className="bg-white dark:bg-slate-700 border border-gray-200 dark:border-gray-600 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 ring-primary-500 dark:text-white"

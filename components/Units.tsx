@@ -110,7 +110,10 @@ export const Units = () => {
                 onChange={e => setType(e.target.value as UnitType)}
                 className="w-full p-3 rounded-xl border bg-white/50 dark:bg-slate-800 border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-primary-500 dark:text-white dark:bg-slate-800"
               >
-                {Object.values(UnitType).map(t => <option key={t} value={t}>{t}</option>)}
+                {/* We map the enum values but display translated text. We assume enum is English. */}
+                {Object.values(UnitType).map(typeVal => (
+                    <option key={typeVal} value={typeVal}>{t(typeVal.toLowerCase() as any)}</option>
+                ))}
               </select>
             </div>
             
@@ -150,7 +153,8 @@ export const Units = () => {
                 </div>
                 <div>
                   <h4 className="font-bold text-lg text-gray-800 dark:text-white">{unit.name}</h4>
-                  <p className="text-sm text-gray-500 uppercase tracking-wide">{unit.type}</p>
+                  {/* Translate the unit type here */}
+                  <p className="text-sm text-gray-500 uppercase tracking-wide">{t(unit.type.toLowerCase() as any)}</p>
                 </div>
               </div>
               

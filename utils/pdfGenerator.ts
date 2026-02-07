@@ -721,67 +721,151 @@ export const generateSubscriptionReceipt = async (user: User, subscription: Subs
     await generatePdfFromHtml(html, `Subscription_${user.full_name}.pdf`, isRTL);
 };
 
-export const generateExpenseReport = async (expenses: Expense[], units: Unit[], lang: Language, t: any) => {
+export const generateExpenseReport = async (
+    expenses: Expense[], 
+    units: Unit[], 
+    lang: Language, 
+    t: any,
+    filterStart?: string,
+    filterEnd?: string,
+    filterUnitId?: string
+) => {
      const isRTL = lang === 'ar';
-     const total = expenses.reduce((sum, e) => sum + e.amount, 0);
+     const reportDate = format(new Date(), 'dd MMMM yyyy');
+     const periodLabel = getReportPeriodLabel(filterStart || '', filterEnd || '', t);
+
+     // Apply Filters to Expenses
+     const filteredExpenses = expenses.filter(e => {
+        const matchesUnit = !filterUnitId || filterUnitId === 'all' || e.unit_id === filterUnitId;
+        let matchesDate = true;
+        if (filterStart && filterEnd) {
+             const eDate = parseISO(e.date);
+             const rangeStart = startOfDay(parseISO(filterStart));
+             const rangeEnd = endOfDay(parseISO(filterEnd));
+             matchesDate = isWithinInterval(eDate, { start: rangeStart, end: rangeEnd });
+        }
+        return matchesUnit && matchesDate;
+    });
+
+     // Filter Units (only units that have expenses or all if specific filter applied)
+     const displayedUnits = units.filter(u => {
+        if (filterUnitId && filterUnitId !== 'all') return u.id === filterUnitId;
+        // Optionally show all units even if no expenses, or just ones with expenses. 
+        // For 'all', let's show only units with expenses to keep report clean, or show all. 
+        // Let's show units that have matching expenses to avoid empty blocks.
+        return filteredExpenses.some(e => e.unit_id === u.id); 
+     });
      
      const labels = isRTL ? {
-         title: 'تقرير المصروفات',
-         date: 'التاريخ',
+         title: 'تقرير المصروفات التفصيلي',
+         generated: 'تاريخ التقرير',
+         reportPeriod: 'فترة التقرير',
          unit: 'الوحدة',
+         date: 'التاريخ',
          titleCol: 'العنوان',
          category: 'الفئة',
          amount: 'المبلغ',
-         total: 'الإجمالي',
-         currency: 'ج.م'
+         unitTotal: 'إجمالي الوحدة',
+         grandTotal: 'إجمالي المصروفات الكلي',
+         currency: 'ج.م',
+         footer: 'تقرير المصروفات - نظام صن لايت'
      } : {
-         title: 'Expenses Report',
-         date: 'Date',
+         title: 'Detailed Expenses Report',
+         generated: 'Report Date',
+         reportPeriod: 'Report Period',
          unit: 'Unit',
+         date: 'Date',
          titleCol: 'Title',
          category: 'Category',
          amount: 'Amount',
-         total: 'Total',
-         currency: 'EGP'
+         unitTotal: 'Unit Total',
+         grandTotal: 'Grand Total',
+         currency: 'EGP',
+         footer: 'Expenses Report - Sunlight System'
      };
 
-     const rows = expenses.map(e => `
-        <tr style="border-bottom: 1px solid #e2e8f0;">
-            <td style="padding: 12px;">${format(new Date(e.date), 'yyyy-MM-dd')}</td>
-            <td style="padding: 12px;">${units.find(u => u.id === e.unit_id)?.name || '-'}</td>
-            <td style="padding: 12px;">${e.title}</td>
-            <td style="padding: 12px;">${e.category}</td>
-            <td style="padding: 12px; text-align: ${isRTL ? 'left' : 'right'}; font-weight: bold; color: #dc2626;">${e.amount.toLocaleString()}</td>
-        </tr>
-     `).join('');
+     let contentHtml = '';
+     let grandTotalAmount = 0;
+
+     displayedUnits.forEach(u => {
+        const unitExpenses = filteredExpenses
+            .filter(e => e.unit_id === u.id)
+            .sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        if (unitExpenses.length === 0) return;
+
+        const unitTotal = unitExpenses.reduce((sum, e) => sum + e.amount, 0);
+        grandTotalAmount += unitTotal;
+
+        const rows = unitExpenses.map(e => `
+            <tr style="border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
+                <td style="padding: 10px; font-weight: bold; color: #1e293b;">${e.title}</td>
+                <td style="padding: 10px; color: #475569; font-size: 11px;">
+                    <span style="background: #f1f5f9; padding: 2px 6px; rounded: 4px;">
+                      ${t(e.category.toLowerCase().replace(' ', '_') as any) || e.category}
+                    </span>
+                </td>
+                <td style="padding: 10px; color: #334155; font-size: 11px;">${format(new Date(e.date), 'yyyy-MM-dd')}</td>
+                <td style="padding: 10px; text-align: ${isRTL ? 'left' : 'right'}; font-weight: bold; color: #dc2626;">${e.amount.toLocaleString()}</td>
+            </tr>
+        `).join('');
+
+        const summaryRow = `
+            <tr style="background-color: #fef2f2; border-top: 2px solid #fecaca; font-weight: bold;">
+                <td colspan="3" style="padding: 12px; text-align: ${isRTL ? 'left' : 'right'}; color: #991b1b;">${labels.unitTotal}</td>
+                <td style="padding: 12px; text-align: ${isRTL ? 'left' : 'right'}; color: #dc2626;">${unitTotal.toLocaleString()}</td>
+            </tr>
+        `;
+
+        contentHtml += `
+            <div style="margin-bottom: 30px; border: 1px solid #fecaca; border-radius: 12px; overflow: hidden; page-break-inside: avoid;">
+                <div style="background: #fee2e2; padding: 12px 20px; border-bottom: 1px solid #fecaca;">
+                    <h3 style="margin: 0; color: #991b1b; font-size: 16px; font-weight: 800;">${u.name}</h3>
+                </div>
+                <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                    <thead style="background: #ffffff; border-bottom: 2px solid #f1f5f9; color: #475569;">
+                        <tr>
+                            <th style="text-align: ${isRTL ? 'right' : 'left'}; padding: 10px; width: 35%;">${labels.titleCol}</th>
+                            <th style="text-align: ${isRTL ? 'right' : 'left'}; padding: 10px; width: 25%;">${labels.category}</th>
+                            <th style="text-align: ${isRTL ? 'right' : 'left'}; padding: 10px; width: 20%;">${labels.date}</th>
+                            <th style="text-align: ${isRTL ? 'left' : 'right'}; padding: 10px; width: 20%;">${labels.amount}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows}
+                        ${summaryRow}
+                    </tbody>
+                </table>
+            </div>
+        `;
+     });
 
      const html = `
       <div style="font-family: 'Cairo', sans-serif; padding: 40px; color: #1f2937; direction: ${isRTL ? 'rtl' : 'ltr'};">
-         <h1 style="color: #0f172a; font-size: 28px; font-weight: 800; margin-bottom: 10px;">${labels.title}</h1>
-         <p style="color: #64748b; margin-bottom: 30px;">${format(new Date(), 'yyyy-MM-dd')}</p>
+         <div style="text-align: center; margin-bottom: 40px; border-bottom: 3px solid #dc2626; padding-bottom: 20px;">
+             <h1 style="color: #b91c1c; font-size: 32px; font-weight: 800; margin: 0;">${labels.title}</h1>
+             <p style="margin: 5px 0; color: #94a3b8; font-size: 12px;">${labels.generated}: ${reportDate}</p>
+             ${filterStart && filterEnd ? `<p style="margin: 5px 0; color: #7f1d1d; font-size: 13px; font-weight: bold; background: #fef2f2; display: inline-block; padding: 4px 10px; border-radius: 5px; border: 1px solid #fecaca;">${labels.reportPeriod}: ${periodLabel}</p>` : ''}
+         </div>
 
-         <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-            <thead style="background: #f1f5f9; color: #475569;">
-                <tr>
-                    <th style="padding: 12px; text-align: ${isRTL ? 'right' : 'left'};">${labels.date}</th>
-                    <th style="padding: 12px; text-align: ${isRTL ? 'right' : 'left'};">${labels.unit}</th>
-                    <th style="padding: 12px; text-align: ${isRTL ? 'right' : 'left'};">${labels.titleCol}</th>
-                    <th style="padding: 12px; text-align: ${isRTL ? 'right' : 'left'};">${labels.category}</th>
-                    <th style="padding: 12px; text-align: ${isRTL ? 'left' : 'right'};">${labels.amount}</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${rows}
-                <tr style="background: #f8fafc; font-weight: bold;">
-                    <td colspan="4" style="padding: 12px; text-align: ${isRTL ? 'left' : 'right'};">${labels.total}</td>
-                    <td style="padding: 12px; text-align: ${isRTL ? 'left' : 'right'}; color: #dc2626;">${total.toLocaleString()} ${labels.currency}</td>
-                </tr>
-            </tbody>
-         </table>
+         ${contentHtml || `<p style="text-align:center; padding: 20px; font-weight:bold;">No expenses found.</p>`}
+
+         ${contentHtml ? `
+            <div style="margin-top: 20px; background: #fef2f2; border: 2px solid #dc2626; border-radius: 12px; padding: 20px; page-break-inside: avoid;">
+                <h3 style="margin: 0 0 10px 0; color: #b91c1c; text-align: center;">${labels.grandTotal}</h3>
+                <div style="text-align: center;">
+                    <div style="font-size: 32px; font-weight: 800; color: #dc2626;">${grandTotalAmount.toLocaleString()} <span style="font-size: 16px;">${labels.currency}</span></div>
+                </div>
+            </div>
+         ` : ''}
+
+         <div style="margin-top: 50px; text-align: center; font-size: 11px; color: #94a3b8; font-weight: 600;">
+            ${labels.footer}
+         </div>
       </div>
      `;
      
-     await generatePdfFromHtml(html, `Expenses_Report.pdf`, isRTL);
+     await generatePdfFromHtml(html, `Detailed_Expenses_Report.pdf`, isRTL);
 };
 
 export const generateFinancialReport = async (

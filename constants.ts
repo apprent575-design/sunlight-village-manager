@@ -97,6 +97,15 @@ export const TRANSLATIONS = {
     totalDays: 'Total Days',
     reportPeriod: 'Report Period',
     generateReport: 'Generate Report',
+    // Expenses Categories
+    maintenance: 'Maintenance',
+    electricity: 'Electricity',
+    water: 'Water',
+    internet: 'Internet',
+    gas: 'Gas',
+    cleaning_supplies: 'Cleaning Supplies',
+    furniture: 'Furniture',
+    other: 'Other',
     // Admin & Subscription
     adminDashboard: 'Admin Dashboard',
     accounts: 'Accounts',
@@ -129,7 +138,12 @@ export const TRANSLATIONS = {
     subscriptionReportDesc: 'Comprehensive list of all clients, revenues, and statuses.',
     totalClients: 'Total Clients',
     totalRevenue: 'Total Revenue',
-    revenue: 'Revenue'
+    revenue: 'Revenue',
+    // Expenses Report Specific
+    expensesReport: 'Detailed Expenses Report',
+    unitTotal: 'Unit Total',
+    titleCol: 'Title',
+    title: 'Title'
   },
   ar: {
     dashboard: 'لوحة التحكم',
@@ -226,6 +240,15 @@ export const TRANSLATIONS = {
     totalDays: 'إجمالي الأيام',
     reportPeriod: 'فترة التقرير',
     generateReport: 'استخراج التقرير',
+    // Expenses Categories
+    maintenance: 'صيانة',
+    electricity: 'كهرباء',
+    water: 'مياه',
+    internet: 'إنترنت',
+    gas: 'غاز',
+    cleaning_supplies: 'أدوات نظافة',
+    furniture: 'أثاث',
+    other: 'أخرى',
     // Admin
     adminDashboard: 'لوحة تحكم المسؤول',
     accounts: 'الحسابات',
@@ -258,7 +281,12 @@ export const TRANSLATIONS = {
     subscriptionReportDesc: 'قائمة شاملة بجميع العملاء، الإيرادات، وحالات الاشتراك.',
     totalClients: 'إجمالي العملاء',
     totalRevenue: 'إجمالي الإيرادات',
-    revenue: 'الإيرادات'
+    revenue: 'الإيرادات',
+    // Expenses Report Specific
+    expensesReport: 'تقرير المصروفات التفصيلي',
+    unitTotal: 'إجمالي الوحدة',
+    titleCol: 'العنوان',
+    title: 'العنوان'
   }
 };
 

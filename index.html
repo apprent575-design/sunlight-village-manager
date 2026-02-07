@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -58,7 +59,6 @@
     </script>
     <style>
       body {
-        /* Modern Gradient Background */
         background-color: #f8fafc;
         background-image: 
           radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.08) 0px, transparent 50%),
@@ -87,38 +87,99 @@
         border: 1px solid rgba(255, 255, 255, 0.05);
       }
 
-      /* Calendar Modernization */
+      /* --- MODERN CALENDAR STYLING --- */
       .rbc-calendar { font-family: 'Cairo', sans-serif; }
+      
+      /* Month View Container */
       .rbc-month-view {
-        border-radius: 24px;
+        border-radius: 20px;
         overflow: hidden;
-        background: rgba(255, 255, 255, 0.6);
-        border: 1px solid rgba(226, 232, 240, 0.8);
-        backdrop-filter: blur(8px);
+        border: none !important; /* Remove default ugly border */
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+        background: white;
       }
       .dark .rbc-month-view {
-        background: rgba(15, 23, 42, 0.6);
-        border-color: rgba(51, 65, 85, 0.5);
+        background: rgba(30, 41, 59, 0.4);
       }
+
+      /* Header (Days of week) */
       .rbc-header {
-        padding: 16px 0;
+        padding: 12px 0;
         font-weight: 700;
         font-size: 13px;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.5px;
         text-transform: uppercase;
-        color: #64748b;
-        background: transparent;
-        border-bottom: 1px solid rgba(226, 232, 240, 0.8) !important;
+        color: #64748b; /* Slate 500 */
+        background: #f8fafc; /* Slate 50 */
+        border-bottom: 1px solid #e2e8f0 !important;
+        border-left: none !important;
       }
       .dark .rbc-header {
         color: #94a3b8;
-        border-bottom-color: rgba(51, 65, 85, 0.5) !important;
+        background: rgba(30, 41, 59, 0.8);
+        border-bottom-color: rgba(255,255,255,0.05) !important;
       }
+
+      /* Date Cells */
+      .rbc-day-bg {
+        border-left: 1px solid #f1f5f9 !important; /* Lighter borders */
+      }
+      .dark .rbc-day-bg {
+        border-left: 1px solid rgba(255,255,255,0.05) !important;
+      }
+      
+      /* Row Borders */
+      .rbc-month-row {
+        border-bottom: 1px solid #f1f5f9 !important;
+      }
+      .dark .rbc-month-row {
+        border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+      }
+
+      /* "Today" Highlight */
       .rbc-today {
-        background-color: rgba(59, 130, 246, 0.05) !important;
+        background-color: rgba(14, 165, 233, 0.08) !important; /* Soft Sky Blue */
       }
       .dark .rbc-today {
-        background-color: rgba(59, 130, 246, 0.1) !important;
+        background-color: rgba(14, 165, 233, 0.15) !important;
+      }
+
+      /* Off-Range Dates */
+      .rbc-off-range-bg {
+        background-color: #fcfcfc !important;
+      }
+      .dark .rbc-off-range-bg {
+        background-color: rgba(15, 23, 42, 0.6) !important;
+      }
+
+      /* Date Number Styling */
+      .rbc-date-cell {
+        padding: 8px !important;
+        font-size: 12px;
+        font-weight: 600;
+        color: #475569;
+      }
+      .dark .rbc-date-cell {
+        color: #cbd5e1;
+      }
+      .rbc-now .rbc-button-link {
+        color: #0ea5e9; /* Brand Color for today's number */
+        font-weight: 800;
+      }
+
+      /* Event Styling */
+      .rbc-event {
+        border-radius: 6px !important;
+        padding: 2px 4px !important;
+        font-size: 11px !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        border: none !important;
+        margin-bottom: 2px !important;
+      }
+      
+      /* Hide default focus outline */
+      .rbc-event:focus {
+        outline: none;
       }
 
       /* Hide Scrollbar but allow scrolling */

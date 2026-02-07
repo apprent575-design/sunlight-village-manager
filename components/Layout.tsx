@@ -25,13 +25,14 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  // Reordered Navigation: Dashboard -> Units -> Bookings -> Calendar...
   const userNavItems = [
     { path: '/', icon: LayoutDashboard, label: t('dashboard') },
+    { path: '/units', icon: Home, label: t('units') },
     { path: '/bookings', icon: BookOpen, label: t('bookings') },
     { path: '/calendar', icon: Calendar, label: t('calendar') },
     { path: '/expenses', icon: DollarSign, label: t('expenses') },
     { path: '/reports', icon: PieChart, label: t('reports') },
-    { path: '/units', icon: Home, label: t('units') },
     { path: '/settings', icon: Settings, label: t('settings') },
   ];
 

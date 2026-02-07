@@ -7,7 +7,7 @@ import { format, addDays, parseISO, isWithinInterval, isValid } from 'date-fns';
 import { generateReceipt } from '../utils/pdfGenerator';
 
 export const Bookings = () => {
-  const { t, state, addBooking, updateBooking, deleteBooking, language } = useApp();
+  const { t, state, addBooking, updateBooking, deleteBooking, language, isRTL } = useApp();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [bookingToDelete, setBookingToDelete] = useState<Booking | null>(null);
@@ -196,7 +196,7 @@ export const Bookings = () => {
                     value={filterStart}
                     onChange={(e) => setFilterStart(e.target.value)}
                 />
-                <span className="text-gray-400">→</span>
+                <span className="text-gray-400 font-bold">{isRTL ? '←' : '→'}</span>
                 <input 
                     type="date" 
                     className="bg-transparent outline-none text-sm dark:text-gray-300 w-32" 
