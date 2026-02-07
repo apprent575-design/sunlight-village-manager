@@ -44,25 +44,27 @@ export const AdminSubscriptions = () => {
     e.preventDefault();
     if (!selectedUser) return;
 
+    // Logic: If we are adding/renewing, we almost certainly want it to be 'active'
     const subPayload: Subscription = {
         id: editingSubId || crypto.randomUUID(),
         user_id: selectedUser.id,
         start_date: startDate,
         duration_days: duration,
         price: price,
-        status: 'active'
+        status: 'active' // Auto-activate on save
     };
 
-    if (editingSubId) {
-        // Keep status if editing, unless it was expired and we are adding time, logic handled in backend usually but here we reset to active if adding new
-        // For simple edit, let's keep status as active if we are saving from this form
-        await updateSubscription(subPayload);
-    } else {
-        await addSubscription(subPayload);
+    try {
+        if (editingSubId) {
+            await updateSubscription(subPayload);
+        } else {
+            await addSubscription(subPayload);
+        }
+        setSelectedUser(null);
+        setEditingSubId(null);
+    } catch (error) {
+        alert("Failed to save subscription! Make sure your account is an Admin in the database.\n\nError: " + (error as any).message);
     }
-
-    setSelectedUser(null);
-    setEditingSubId(null);
   };
 
   const confirmDelete = async () => {
@@ -70,6 +72,8 @@ export const AdminSubscriptions = () => {
           setIsDeleting(true);
           try {
               await deleteSubscription(subToDelete.id);
+          } catch (error) {
+              alert("Failed to delete. Error: " + (error as any).message);
           } finally {
               setIsDeleting(false);
               setSubToDelete(null);
@@ -79,7 +83,11 @@ export const AdminSubscriptions = () => {
 
   const togglePause = async (sub: Subscription) => {
       const newStatus = sub.status === 'paused' ? 'active' : 'paused';
-      await updateSubscription({ ...sub, status: newStatus });
+      try {
+          await updateSubscription({ ...sub, status: newStatus });
+      } catch (error) {
+          alert("Failed to update status.");
+      }
   };
 
   const filteredUsers = state.allUsers.filter(u => 

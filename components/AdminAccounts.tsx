@@ -8,7 +8,9 @@ export const AdminAccounts = () => {
   const { state, t } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
 
+  // Explicitly filter out admin@gmail.com just in case the context didn't catch it
   const filteredUsers = state.allUsers.filter(u => 
+    u.email !== 'admin@gmail.com' &&
     (u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
     u.email.toLowerCase().includes(searchTerm.toLowerCase()))
   );
@@ -47,6 +49,9 @@ export const AdminAccounts = () => {
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-700/50">
+                    {filteredUsers.length === 0 && (
+                        <tr><td colSpan={4} className="p-8 text-center text-gray-500">No client accounts found.</td></tr>
+                    )}
                     {filteredUsers.map(user => {
                         const unitsCount = state.units.filter(u => u.user_id === user.id).length;
                         const bookingsCount = state.bookings.filter(b => b.user_id === user.id).length;

@@ -14,9 +14,21 @@ import { Auth } from './components/Auth';
 import { AdminAccounts } from './components/AdminAccounts';
 import { AdminSubscriptions } from './components/AdminSubscriptions';
 import { AdminReports } from './components/AdminReports';
+import { Loader2 } from 'lucide-react';
 
 const AppContent = () => {
-  const { user, isAdmin } = useApp();
+  const { user, isAdmin, isLoading } = useApp();
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-slate-900">
+        <div className="flex flex-col items-center gap-4">
+            <Loader2 className="animate-spin text-primary-500" size={48} />
+            <p className="text-gray-500 dark:text-gray-400 font-medium animate-pulse">Loading Sunlight...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <HashRouter>
