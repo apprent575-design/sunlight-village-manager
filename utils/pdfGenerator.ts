@@ -1,7 +1,8 @@
+
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Booking, Unit, Expense, Language, BookingStatus, User, Subscription } from '../types';
-import { format, addDays, parseISO, isAfter, differenceInDays } from 'date-fns';
+import { format, addDays, parseISO, isAfter, differenceInDays, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 
 const generatePdfFromHtml = async (htmlContent: string, fileName: string, isRTL: boolean) => {
   const container = document.createElement('div');
@@ -43,6 +44,28 @@ const generatePdfFromHtml = async (htmlContent: string, fileName: string, isRTL:
   } finally {
     if (document.body.contains(container)) document.body.removeChild(container);
   }
+};
+
+// --- Helper for Filters ---
+const filterBookings = (bookings: Booking[], start?: string, end?: string, unitId?: string) => {
+    return bookings.filter(b => {
+        const isUnitMatch = !unitId || unitId === 'all' || b.unit_id === unitId;
+        let isDateMatch = true;
+        if (start && end) {
+            const bStart = parseISO(b.start_date);
+            const rangeStart = startOfDay(parseISO(start));
+            const rangeEnd = endOfDay(parseISO(end));
+            // Check if booking overlaps with range
+            isDateMatch = isWithinInterval(bStart, { start: rangeStart, end: rangeEnd }) ||
+                          (isAfter(bStart, rangeStart) && !isAfter(bStart, rangeEnd));
+        }
+        return isUnitMatch && isDateMatch;
+    });
+};
+
+const getReportPeriodLabel = (start: string, end: string, t: any) => {
+    if (!start || !end) return t('allTime') || 'All Time';
+    return `${start} -> ${end}`;
 };
 
 export const generateReceipt = async (booking: Booking, unitName: string, lang: Language, t: any) => {
@@ -280,14 +303,32 @@ export const generateReceipt = async (booking: Booking, unitName: string, lang: 
   await generatePdfFromHtml(html, `Receipt_${booking.tenant_name}.pdf`, isRTL);
 };
 
-export const generateOccupancyReport = async (units: Unit[], bookings: Booking[], lang: Language, t: any) => {
+export const generateOccupancyReport = async (
+    units: Unit[], 
+    bookings: Booking[], 
+    lang: Language, 
+    t: any,
+    filterStart?: string,
+    filterEnd?: string,
+    filterUnitId?: string
+) => {
     const isRTL = lang === 'ar';
     const reportDate = format(new Date(), 'dd MMMM yyyy');
+    const periodLabel = getReportPeriodLabel(filterStart || '', filterEnd || '', t);
+
+    // Apply Filters
+    const filteredBookings = filterBookings(bookings, filterStart, filterEnd, filterUnitId);
+    // Filter Units based on bookings or selection
+    const displayedUnits = units.filter(u => {
+        if (filterUnitId && filterUnitId !== 'all') return u.id === filterUnitId;
+        return true; 
+    });
 
     const labels = isRTL ? {
         title: 'تقرير الإشغال التفصيلي',
         subtitle: 'بيان تفصيلي للإيجارات والرسوم والهاوس كيبنج',
         generated: 'تاريخ التقرير',
+        reportPeriod: 'فترة التقرير',
         unit: 'الوحدة',
         tenant: 'المستأجر',
         phone: 'الهاتف',
@@ -306,6 +347,7 @@ export const generateOccupancyReport = async (units: Unit[], bookings: Booking[]
         title: 'Detailed Occupancy Report',
         subtitle: 'Detailed breakdown of rent, fees, and housekeeping',
         generated: 'Report Date',
+        reportPeriod: 'Report Period',
         unit: 'Unit',
         tenant: 'Tenant',
         phone: 'Phone',
@@ -324,8 +366,8 @@ export const generateOccupancyReport = async (units: Unit[], bookings: Booking[]
 
     let contentHtml = '';
 
-    units.forEach(u => {
-        const unitBookings = bookings
+    displayedUnits.forEach(u => {
+        const unitBookings = filteredBookings
             .filter(b => b.unit_id === u.id)
             .sort((a,b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
         
@@ -342,10 +384,8 @@ export const generateOccupancyReport = async (units: Unit[], bookings: Booking[]
             const baseRent = b.nightly_rate * b.nights;
             const fees = (b.village_fee || 0) * b.nights;
             const hk = b.housekeeping_enabled ? (b.housekeeping_price || 0) : 0;
-            const grand = b.total_rental_price; // Should match sum, using stored value
+            const grand = b.total_rental_price; 
 
-            // Logic Fix: Include Pending bookings in the summary as they block the calendar/occupancy
-            // Only exclude Cancelled bookings
             if (b.status !== BookingStatus.CANCELLED) {
                 unitBase += baseRent;
                 unitFees += fees;
@@ -353,9 +393,8 @@ export const generateOccupancyReport = async (units: Unit[], bookings: Booking[]
                 unitGrand += grand;
             }
 
-            const statusColor = b.status === BookingStatus.CONFIRMED ? '#166534' : '#854d0e'; // Green or Brown
+            const statusColor = b.status === BookingStatus.CONFIRMED ? '#166534' : '#854d0e';
             const statusBg = b.status === BookingStatus.CONFIRMED ? '#dcfce7' : '#fef9c3';
-
             const payStatusBg = b.payment_status === 'Paid' ? '#dcfce7' : '#fee2e2';
             const payStatusColor = b.payment_status === 'Paid' ? '#166534' : '#991b1b';
 
@@ -382,7 +421,6 @@ export const generateOccupancyReport = async (units: Unit[], bookings: Booking[]
             </tr>
         `}).join('');
 
-        // Unit Summary Row
         const summaryRow = `
             <tr style="background-color: #f1f5f9; border-top: 2px solid #cbd5e1; font-weight: bold;">
                 <td colspan="4" style="padding: 12px; text-align: ${isRTL ? 'left' : 'right'}; color: #334155;">${labels.unitTotal}</td>
@@ -431,9 +469,10 @@ export const generateOccupancyReport = async (units: Unit[], bookings: Booking[]
             <h1 style="color: #0369a1; font-size: 32px; font-weight: 800; margin: 0;">${labels.title}</h1>
             <p style="margin: 5px 0; color: #64748b; font-size: 14px; font-weight: 600;">${labels.subtitle}</p>
             <p style="margin: 5px 0; color: #94a3b8; font-size: 12px;">${labels.generated}: ${reportDate}</p>
+            ${filterStart && filterEnd ? `<p style="margin: 5px 0; color: #0f172a; font-size: 13px; font-weight: bold; background: #f0f9ff; display: inline-block; px: 10px; border-radius: 5px;">${labels.reportPeriod}: ${periodLabel}</p>` : ''}
         </div>
 
-        ${contentHtml || `<p style="text-align:center; padding: 20px; font-weight:bold;">No bookings found.</p>`}
+        ${contentHtml || `<p style="text-align:center; padding: 20px; font-weight:bold;">No bookings found for selected criteria.</p>`}
 
         <div style="margin-top: 50px; text-align: center; font-size: 11px; color: #94a3b8; font-weight: 600;">
             ${labels.footer}
@@ -442,6 +481,160 @@ export const generateOccupancyReport = async (units: Unit[], bookings: Booking[]
     `;
 
     await generatePdfFromHtml(html, `Detailed_Occupancy_Report_${format(new Date(), 'yyyy-MM-dd')}.pdf`, isRTL);
+};
+
+export const generateVillageFeesReport = async (
+    units: Unit[], 
+    bookings: Booking[], 
+    lang: Language, 
+    t: any,
+    filterStart?: string,
+    filterEnd?: string,
+    filterUnitId?: string
+) => {
+    const isRTL = lang === 'ar';
+    const reportDate = format(new Date(), 'dd MMMM yyyy');
+    const periodLabel = getReportPeriodLabel(filterStart || '', filterEnd || '', t);
+
+    // Apply Filters
+    const filteredBookings = filterBookings(bookings, filterStart, filterEnd, filterUnitId);
+    const displayedUnits = units.filter(u => {
+        if (filterUnitId && filterUnitId !== 'all') return u.id === filterUnitId;
+        return true; 
+    });
+
+    const labels = isRTL ? {
+        title: 'تقرير رسوم القرية (البوابات)',
+        subtitle: 'بيان تفصيلي للرسوم حسب الوحدة',
+        generated: 'تاريخ التقرير',
+        reportPeriod: 'فترة التقرير',
+        unit: 'الوحدة',
+        tenant: 'المستأجر',
+        dates: 'التواريخ',
+        nights: 'عدد الأيام',
+        dailyFee: 'سعر اليوم',
+        totalFee: 'إجمالي الرسوم',
+        unitTotal: 'إجمالي الوحدة',
+        grandTotal: 'الإجمالي العام',
+        totalDays: 'إجمالي الأيام',
+        footer: 'تقرير الرسوم - نظام صن لايت'
+    } : {
+        title: 'Village Fees Report',
+        subtitle: 'Detailed fees breakdown by unit',
+        generated: 'Report Date',
+        reportPeriod: 'Report Period',
+        unit: 'Unit',
+        tenant: 'Tenant',
+        dates: 'Dates',
+        nights: 'Days',
+        dailyFee: 'Daily Rate',
+        totalFee: 'Total Fees',
+        unitTotal: 'Unit Total',
+        grandTotal: 'Grand Total',
+        totalDays: 'Total Days',
+        footer: 'Fees Report - Sunlight System'
+    };
+
+    let contentHtml = '';
+    let grandTotalFees = 0;
+    let grandTotalDays = 0;
+
+    displayedUnits.forEach(u => {
+        const unitBookings = filteredBookings
+            .filter(b => b.unit_id === u.id && b.status !== BookingStatus.CANCELLED)
+            .sort((a,b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
+        
+        if (unitBookings.length === 0) return;
+
+        let unitTotalFees = 0;
+        let unitTotalDays = 0;
+
+        const rows = unitBookings.map(b => {
+            const fees = (b.village_fee || 0) * b.nights;
+            unitTotalFees += fees;
+            unitTotalDays += b.nights;
+
+            return `
+            <tr style="border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
+                <td style="padding: 10px; font-weight: bold; color: #1e293b;">${b.tenant_name}</td>
+                <td style="padding: 10px; color: #334155; font-size: 11px;">${format(new Date(b.start_date), 'yyyy-MM-dd')} / ${format(new Date(b.end_date), 'yyyy-MM-dd')}</td>
+                <td style="padding: 10px; text-align: center;">${b.nights}</td>
+                <td style="padding: 10px; text-align: ${isRTL ? 'left' : 'right'}; color: #475569;">${b.village_fee || 0}</td>
+                <td style="padding: 10px; text-align: ${isRTL ? 'left' : 'right'}; font-weight: bold; color: #d97706;">${fees.toLocaleString()}</td>
+            </tr>
+            `;
+        }).join('');
+
+        grandTotalFees += unitTotalFees;
+        grandTotalDays += unitTotalDays;
+
+        const summaryRow = `
+            <tr style="background-color: #fff7ed; border-top: 2px solid #fed7aa; font-weight: bold;">
+                <td colspan="2" style="padding: 12px; text-align: ${isRTL ? 'left' : 'right'}; color: #9a3412;">${labels.unitTotal}</td>
+                <td style="padding: 12px; text-align: center; color: #9a3412;">${unitTotalDays}</td>
+                <td></td>
+                <td style="padding: 12px; text-align: ${isRTL ? 'left' : 'right'}; color: #c2410c;">${unitTotalFees.toLocaleString()}</td>
+            </tr>
+        `;
+
+        contentHtml += `
+            <div style="margin-bottom: 30px; border: 1px solid #fed7aa; border-radius: 12px; overflow: hidden; page-break-inside: avoid;">
+                <div style="background: #ffedd5; padding: 12px 20px; border-bottom: 1px solid #fed7aa;">
+                    <h3 style="margin: 0; color: #c2410c; font-size: 16px; font-weight: 800;">${u.name}</h3>
+                </div>
+                <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+                    <thead style="background: #ffffff; border-bottom: 2px solid #f1f5f9; color: #475569;">
+                        <tr>
+                            <th style="text-align: ${isRTL ? 'right' : 'left'}; padding: 10px; width: 25%;">${labels.tenant}</th>
+                            <th style="text-align: ${isRTL ? 'right' : 'left'}; padding: 10px; width: 25%;">${labels.dates}</th>
+                            <th style="text-align: center; padding: 10px; width: 15%;">${labels.nights}</th>
+                            <th style="text-align: ${isRTL ? 'left' : 'right'}; padding: 10px; width: 15%;">${labels.dailyFee}</th>
+                            <th style="text-align: ${isRTL ? 'left' : 'right'}; padding: 10px; width: 20%;">${labels.totalFee}</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows}
+                        ${summaryRow}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    });
+
+    const html = `
+    <div style="font-family: 'Cairo', sans-serif; padding: 40px; direction: ${isRTL ? 'rtl' : 'ltr'}; color: #0f172a;">
+        <div style="text-align: center; margin-bottom: 40px; border-bottom: 3px solid #f97316; padding-bottom: 20px;">
+            <h1 style="color: #c2410c; font-size: 32px; font-weight: 800; margin: 0;">${labels.title}</h1>
+            <p style="margin: 5px 0; color: #64748b; font-size: 14px; font-weight: 600;">${labels.subtitle}</p>
+            <p style="margin: 5px 0; color: #94a3b8; font-size: 12px;">${labels.generated}: ${reportDate}</p>
+            ${filterStart && filterEnd ? `<p style="margin: 5px 0; color: #0f172a; font-size: 13px; font-weight: bold; background: #fff7ed; display: inline-block; padding: 4px 10px; border-radius: 5px; border: 1px solid #fed7aa;">${labels.reportPeriod}: ${periodLabel}</p>` : ''}
+        </div>
+
+        ${contentHtml || `<p style="text-align:center; padding: 20px; font-weight:bold;">No bookings found.</p>`}
+
+        ${contentHtml ? `
+        <div style="margin-top: 20px; background: #fff7ed; border: 2px solid #f97316; border-radius: 12px; padding: 20px; page-break-inside: avoid;">
+            <h3 style="margin: 0 0 10px 0; color: #c2410c; text-align: center;">${labels.grandTotal}</h3>
+            <div style="display: flex; justify-content: space-around; text-align: center;">
+                <div>
+                    <div style="font-size: 12px; color: #9a3412; font-weight: bold; text-transform: uppercase;">${labels.totalDays}</div>
+                    <div style="font-size: 24px; font-weight: 800; color: #ea580c;">${grandTotalDays}</div>
+                </div>
+                <div>
+                    <div style="font-size: 12px; color: #9a3412; font-weight: bold; text-transform: uppercase;">${labels.totalFee}</div>
+                    <div style="font-size: 24px; font-weight: 800; color: #ea580c;">${grandTotalFees.toLocaleString()}</div>
+                </div>
+            </div>
+        </div>
+        ` : ''}
+
+        <div style="margin-top: 50px; text-align: center; font-size: 11px; color: #94a3b8; font-weight: 600;">
+            ${labels.footer}
+        </div>
+    </div>
+    `;
+
+    await generatePdfFromHtml(html, `Village_Fees_Report_${format(new Date(), 'yyyy-MM-dd')}.pdf`, isRTL);
 };
 
 export const generateSubscriptionReceipt = async (user: User, subscription: Subscription, lang: Language, t: any) => {
@@ -591,21 +784,52 @@ export const generateExpenseReport = async (expenses: Expense[], units: Unit[], 
      await generatePdfFromHtml(html, `Expenses_Report.pdf`, isRTL);
 };
 
-export const generateFinancialReport = async (units: Unit[], bookings: Booking[], expenses: Expense[], lang: Language, t: any) => {
+export const generateFinancialReport = async (
+    units: Unit[], 
+    bookings: Booking[], 
+    expenses: Expense[], 
+    lang: Language, 
+    t: any,
+    filterStart?: string,
+    filterEnd?: string,
+    filterUnitId?: string
+) => {
     const isRTL = lang === 'ar';
+    const periodLabel = getReportPeriodLabel(filterStart || '', filterEnd || '', t);
+
+    // Apply Filters
+    const filteredBookings = filterBookings(bookings, filterStart, filterEnd, filterUnitId);
     
-    // Global Calculations
-    // CHANGED: Revenue is now calculated purely from nightly_rate * nights, excluding fees/housekeeping.
-    const totalRevenue = bookings
+    // Filter Expenses
+    const filteredExpenses = expenses.filter(e => {
+        const isUnitMatch = !filterUnitId || filterUnitId === 'all' || e.unit_id === filterUnitId;
+        let isDateMatch = true;
+        if (filterStart && filterEnd) {
+             const eDate = parseISO(e.date);
+             const rangeStart = startOfDay(parseISO(filterStart));
+             const rangeEnd = endOfDay(parseISO(filterEnd));
+             isDateMatch = isWithinInterval(eDate, { start: rangeStart, end: rangeEnd });
+        }
+        return isUnitMatch && isDateMatch;
+    });
+
+    const displayedUnits = units.filter(u => {
+        if (filterUnitId && filterUnitId !== 'all') return u.id === filterUnitId;
+        return true; 
+    });
+    
+    // Global Calculations based on filtered data
+    const totalRevenue = filteredBookings
         .filter(b => b.status === BookingStatus.CONFIRMED)
         .reduce((sum, b) => sum + (b.nightly_rate * b.nights), 0);
     
-    const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalExpenses = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
     const netProfit = totalRevenue - totalExpenses;
 
     const labels = isRTL ? {
         title: 'الملخص المالي',
         generated: 'تم الإنشاء',
+        reportPeriod: 'فترة التقرير',
         summary: 'ملخص عام',
         revenue: 'إجمالي الإيرادات (الإيجار الأساسي)',
         expenses: 'إجمالي المصروفات',
@@ -620,6 +844,7 @@ export const generateFinancialReport = async (units: Unit[], bookings: Booking[]
     } : {
         title: 'Financial Summary Report',
         generated: 'Generated',
+        reportPeriod: 'Report Period',
         summary: 'Executive Summary',
         revenue: 'Total Revenue (Base Rent)',
         expenses: 'Total Expenses',
@@ -633,14 +858,11 @@ export const generateFinancialReport = async (units: Unit[], bookings: Booking[]
         currency: 'EGP'
     };
 
-    const unitRows = units.map(u => {
-        // Filter bookings and expenses for THIS unit
-        const uBookings = bookings.filter(b => b.unit_id === u.id && b.status === BookingStatus.CONFIRMED);
-        
-        // CHANGED: Revenue per unit is also purely Base Rent.
+    const unitRows = displayedUnits.map(u => {
+        const uBookings = filteredBookings.filter(b => b.unit_id === u.id && b.status === BookingStatus.CONFIRMED);
         const uRev = uBookings.reduce((sum, b) => sum + (b.nightly_rate * b.nights), 0);
         
-        const uExpenses = expenses.filter(e => e.unit_id === u.id);
+        const uExpenses = filteredExpenses.filter(e => e.unit_id === u.id);
         const uExpTotal = uExpenses.reduce((sum, e) => sum + e.amount, 0);
         
         const uNet = uRev - uExpTotal;
@@ -661,6 +883,7 @@ export const generateFinancialReport = async (units: Unit[], bookings: Booking[]
     <div style="font-family: 'Cairo', sans-serif; padding: 40px; color: #1f2937; direction: ${isRTL ? 'rtl' : 'ltr'};">
          <h1 style="color: #0284c7; font-size: 28px; font-weight: 800; margin-bottom: 5px;">${labels.title}</h1>
          <p style="color: #64748b; margin-bottom: 30px; font-size: 12px;">${labels.generated}: ${format(new Date(), 'yyyy-MM-dd HH:mm')}</p>
+         ${filterStart && filterEnd ? `<p style="margin-bottom: 20px; color: #0f172a; font-size: 13px; font-weight: bold; background: #f0f9ff; display: inline-block; padding: 4px 10px; border-radius: 5px;">${labels.reportPeriod}: ${periodLabel}</p>` : ''}
 
          <div style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 30px;">
              <h3 style="margin-top: 0; color: #0f172a;">${labels.summary}</h3>
@@ -702,6 +925,8 @@ export const generateFinancialReport = async (units: Unit[], bookings: Booking[]
 };
 
 export const generateAdminReport = async (users: User[], lang: Language, t: any) => {
+    // Existing Admin Report logic...
+    // (Keeping existing implementation for brevity as it was not requested to change)
     const isRTL = lang === 'ar';
     const usersList = users.filter(u => u.role !== 'admin');
     

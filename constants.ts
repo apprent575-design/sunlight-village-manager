@@ -89,6 +89,14 @@ export const TRANSLATIONS = {
     totalUnits: 'Total Units',
     expenseRecords: 'Expense Records',
     today: 'Today',
+    // New Report Labels
+    villageFeesReport: 'Village Fees Report',
+    villageFeesReportDesc: 'Gate fees breakdown per unit and tenant.',
+    dailyFee: 'Daily Fee',
+    totalFees: 'Total Fees',
+    totalDays: 'Total Days',
+    reportPeriod: 'Report Period',
+    generateReport: 'Generate Report',
     // Admin & Subscription
     adminDashboard: 'Admin Dashboard',
     accounts: 'Accounts',
@@ -210,6 +218,14 @@ export const TRANSLATIONS = {
     totalUnits: 'إجمالي الوحدات',
     expenseRecords: 'سجلات المصروفات',
     today: 'اليوم',
+    // New Report Labels
+    villageFeesReport: 'تقرير رسوم القرية',
+    villageFeesReportDesc: 'بيان تفصيلي لرسوم البوابات لكل وحدة ومستأجر.',
+    dailyFee: 'الرسم اليومي',
+    totalFees: 'إجمالي الرسوم',
+    totalDays: 'إجمالي الأيام',
+    reportPeriod: 'فترة التقرير',
+    generateReport: 'استخراج التقرير',
     // Admin
     adminDashboard: 'لوحة تحكم المسؤول',
     accounts: 'الحسابات',
