@@ -37,7 +37,10 @@ const generatePdfFromHtml = async (htmlContent: string, fileName: string, isRTL:
     const pdfWidth = pdf.internal.pageSize.getWidth();
     const imgHeight = (canvas.height * pdfWidth) / canvas.width;
     pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeight);
+
+    // Direct download
     pdf.save(fileName);
+
   } catch (error) {
     console.error("PDF Generation failed:", error);
     alert("Could not generate PDF.");

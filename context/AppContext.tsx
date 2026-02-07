@@ -219,15 +219,13 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
              return prev; 
          });
       } else if (event === 'SIGNED_OUT') {
-        // CLEANUP STATE ON LOGOUT
-        if (isMounted.current) {
-            setUser(null);
-            setUnits([]);
-            setBookings([]);
-            setExpenses([]);
-            setAllUsers([]);
-            setIsLoading(false);
-        }
+         // Cleanup is handled in logout() mainly, but this catches other signouts
+         setUser(null);
+         setUnits([]);
+         setBookings([]);
+         setExpenses([]);
+         setAllUsers([]);
+         setIsLoading(false);
       }
     });
 
@@ -342,20 +340,25 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   };
 
   const logout = async () => {
+    // 1. Clear Local State Immediately (UI updates instantly)
+    setUser(null);
+    setUnits([]);
+    setBookings([]);
+    setExpenses([]);
+    setAllUsers([]);
+    
+    // 2. Clear Persistence (Using the project reference ID from your supabase URL)
+    localStorage.removeItem('sb-nvnykdzmshpwcevipkdl-auth-token');
+    
+    // 3. Attempt Server SignOut (Best Effort)
     try {
         if (supabase) await (supabase as any).auth.signOut();
     } catch (e) {
-        console.error("Logout error", e);
+        // Expected if token is already invalid/expired (403)
+        // We ignore this because we already cleared the local session.
+        console.log("Server logout failed (harmless):", e);
     } finally {
-        // FORCE UI RESET (Handles 403 Forbidden or already logged out cases)
-        setUser(null);
-        setUnits([]);
-        setBookings([]);
-        setExpenses([]);
-        setAllUsers([]);
         setIsLoading(false);
-        // Clear potential sticky keys (optional)
-        localStorage.removeItem('sb-nvnykdzmshpwcevipkdl-auth-token'); 
     }
   };
 
