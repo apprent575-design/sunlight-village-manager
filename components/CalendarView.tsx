@@ -139,8 +139,10 @@ export const CalendarView = () => {
     title: b.tenant_name,
     desc: state.units.find(u => u.id === b.unit_id)?.name || 'Unit',
     start: new Date(b.start_date),
-    // React-Big-Calendar excludes the end date, so we add 1 day to visually span the checkout day
-    end: addDays(new Date(b.end_date), 1),
+    // Use end_date directly. 
+    // If local timezone > UTC, this extends into checkout day (e.g. 02:00 AM), causing RBC to display checkout day.
+    // If we added +1 day, it would display day AFTER checkout day due to shift.
+    end: new Date(b.end_date), 
     status: b.status,
     resource: b.unit_id,
     allData: b
