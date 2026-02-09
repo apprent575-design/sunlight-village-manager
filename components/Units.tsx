@@ -2,18 +2,18 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { UnitType, Unit } from '../types';
-import { Plus, Home, Edit2, Trash2, Check, X, AlertTriangle, Loader2 } from 'lucide-react';
+import { Plus, Home, Edit2, Trash2, Check, AlertTriangle, Loader2 } from 'lucide-react';
 
 export const Units = () => {
   const { t, state, addUnit, updateUnit, deleteUnit } = useApp();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [unitToDelete, setUnitToDelete] = useState<Unit | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
   
   // Form State
   const [name, setName] = useState('');
   const [type, setType] = useState<UnitType>(UnitType.CHALET);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,15 +37,15 @@ export const Units = () => {
         }
         setName('');
     } catch (error: any) {
-        setErrorMsg(error.message || 'Failed to add unit. Please check subscription.');
+        setErrorMsg(error.message || "Error saving unit");
     }
   };
 
   const startEdit = (unit: Unit) => {
-    setErrorMsg(null);
     setEditingId(unit.id);
     setName(unit.name);
     setType(unit.type);
+    setErrorMsg(null);
   };
 
   const cancelEdit = () => {
@@ -68,176 +68,118 @@ export const Units = () => {
             await deleteUnit(unitToDelete.id);
         } finally {
             setIsDeleting(false);
-            setUnitToDelete(null); // Ensure modal closes regardless of success/error
+            setUnitToDelete(null);
         }
     }
   };
 
   return (
-    <div className="space-y-8 relative">
-      <h2 className="text-3xl font-bold text-gray-800 dark:text-white">{t('units')}</h2>
+    <div className="space-y-6">
+      <h2 className="text-3xl font-black text-gray-800 dark:text-white text-right">{t('units')}</h2>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Form */}
-        <div className="glass p-6 rounded-2xl h-fit">
-          <h3 className="text-xl font-bold mb-4 dark:text-white">
-            {editingId ? t('editUnit') : t('addUnit')}
-          </h3>
-          
-          {/* Error Message Display */}
-          {errorMsg && (
-              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-200 text-sm rounded-xl border border-red-100 dark:border-red-800/50 flex items-start gap-2 animate-in slide-in-from-top-2">
-                  <AlertTriangle size={16} className="shrink-0 mt-0.5" />
-                  <span>{errorMsg}</span>
-              </div>
-          )}
+      <div className="flex flex-col lg:flex-row gap-6">
+        
+        {/* Units List (Left Side - Grow) */}
+        <div className="flex-1 order-2 lg:order-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {state.units.length === 0 && (
+                <div className="col-span-2 text-center p-12 text-gray-400 bg-white dark:bg-slate-800 rounded-2xl border border-dashed border-gray-200 dark:border-slate-700">
+                No units found.
+                </div>
+            )}
+            {state.units.map(unit => (
+                <div key={unit.id} className="bg-white dark:bg-slate-800 p-6 rounded-[20px] shadow-sm border border-gray-100 dark:border-slate-700 flex items-center justify-between group hover:border-blue-200 dark:hover:border-blue-800 transition-all">
+                    
+                    <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button onClick={(e) => handleDeleteClick(e, unit)} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg">
+                            <Trash2 size={18} />
+                        </button>
+                        <button onClick={() => startEdit(unit)} className="p-2 text-gray-400 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg">
+                            <Edit2 size={18} />
+                        </button>
+                    </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium mb-1 dark:text-gray-300">{t('unitName')}</label>
-              <input 
-                type="text" 
-                value={name}
-                onChange={e => setName(e.target.value)}
-                className="w-full p-3 rounded-xl border bg-white/50 dark:bg-slate-800 border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-primary-500 dark:text-white"
-                placeholder="e.g. Sunset Villa 101"
-              />
+                    <div className="flex items-center gap-4 text-right">
+                        <div>
+                            <h4 className="font-bold text-lg text-gray-800 dark:text-white">{unit.name}</h4>
+                            <p className="text-sm text-gray-400 font-medium">{t(unit.type.toLowerCase() as any)}</p>
+                        </div>
+                        <div className="w-12 h-12 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-500 flex items-center justify-center">
+                            <Home size={22} strokeWidth={2.5} />
+                        </div>
+                    </div>
+                
+                </div>
+            ))}
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1 dark:text-gray-300">{t('unitType')}</label>
-              <select 
-                value={type}
-                onChange={e => setType(e.target.value as UnitType)}
-                className="w-full p-3 rounded-xl border bg-white/50 dark:bg-slate-800 border-gray-200 dark:border-gray-700 outline-none focus:ring-2 focus:ring-primary-500 dark:text-white dark:bg-slate-800"
-              >
-                {/* We map the enum values but display translated text. We assume enum is English. */}
-                {Object.values(UnitType).map(typeVal => (
-                    <option key={typeVal} value={typeVal}>{t(typeVal.toLowerCase() as any)}</option>
-                ))}
-              </select>
-            </div>
-            
-            <div className="flex gap-2">
-              {editingId && (
-                <button 
-                  type="button" 
-                  onClick={cancelEdit}
-                  className="flex-1 bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-gray-200 p-3 rounded-xl font-bold"
-                >
-                  {t('cancel')}
-                </button>
-              )}
-              <button 
-                type="submit"
-                className="flex-1 bg-primary-500 hover:bg-primary-600 text-white p-3 rounded-xl font-bold shadow-lg shadow-primary-500/30 transition-all flex items-center justify-center gap-2"
-              >
-                {editingId ? <Check size={20} /> : <Plus size={20} />}
-                {editingId ? t('save') : t('addUnit')}
-              </button>
-            </div>
-          </form>
         </div>
 
-        {/* List */}
-        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-          {state.units.length === 0 && (
-            <div className="col-span-2 text-center p-8 text-gray-500 glass rounded-2xl">
-              No units added yet. Add one to get started.
-            </div>
-          )}
-          {state.units.map(unit => (
-            <div key={unit.id} className="glass p-6 rounded-2xl flex items-center justify-between group hover:border-primary-300 transition-colors shadow-sm bg-white/40 dark:bg-slate-800/40">
-              <div className="flex items-center gap-4">
-                <div className="p-4 rounded-full bg-blue-50 dark:bg-blue-900/30 text-primary-500">
-                  <Home size={24} />
+        {/* Add Form (Right Side - Fixed Width) */}
+        <div className="w-full lg:w-[350px] order-1 lg:order-2 h-fit">
+            <div className="bg-white dark:bg-slate-800 p-6 rounded-[24px] shadow-sm border border-gray-100 dark:border-slate-700 transition-colors">
+            <h3 className="text-xl font-bold mb-6 text-gray-900 dark:text-white text-right">
+                {editingId ? t('editUnit') : t('addUnit')}
+            </h3>
+            
+            {errorMsg && (
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-200 text-sm rounded-xl border border-red-100 dark:border-red-800/50 flex items-start gap-2 justify-end text-right">
+                  <span>{errorMsg}</span>
+                  <AlertTriangle size={16} className="shrink-0 mt-0.5" />
+              </div>
+            )}
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
+                <div>
+                <label className="block text-xs font-bold mb-1.5 text-gray-500 dark:text-gray-400 text-right">{t('unitName')}</label>
+                <input 
+                    type="text" 
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    className="w-full p-3 rounded-xl border border-gray-200 dark:border-slate-600 outline-none focus:ring-2 focus:ring-blue-500 text-right bg-white dark:bg-slate-700 text-gray-900 dark:text-white transition-colors"
+                    placeholder="e.g. Sunset Villa 101"
+                />
                 </div>
                 <div>
-                  <h4 className="font-bold text-lg text-gray-800 dark:text-white">{unit.name}</h4>
-                  {/* Translate the unit type here */}
-                  <p className="text-sm text-gray-500 uppercase tracking-wide">{t(unit.type.toLowerCase() as any)}</p>
+                <label className="block text-xs font-bold mb-1.5 text-gray-500 dark:text-gray-400 text-right">{t('unitType')}</label>
+                <select 
+                    value={type}
+                    onChange={e => setType(e.target.value as UnitType)}
+                    className="w-full p-3 rounded-xl border border-gray-200 dark:border-slate-600 outline-none focus:ring-2 focus:ring-blue-500 text-right bg-white dark:bg-slate-700 text-gray-900 dark:text-white transition-colors"
+                >
+                    {Object.values(UnitType).map(typeVal => (
+                        <option key={typeVal} value={typeVal}>{t(typeVal.toLowerCase() as any)}</option>
+                    ))}
+                </select>
                 </div>
-              </div>
-              
-              <div className="flex gap-2 relative z-10">
+                
+                <div className="pt-2">
                 <button 
-                  type="button"
-                  onClick={() => startEdit(unit)}
-                  className="p-2 bg-gray-100 dark:bg-slate-700 hover:bg-blue-100 dark:hover:bg-blue-900 text-gray-600 dark:text-gray-300 hover:text-blue-600 rounded-lg transition-colors cursor-pointer"
-                  title="Edit"
+                    type="submit"
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white p-3.5 rounded-xl font-bold shadow-lg shadow-blue-500/30 transition-all flex items-center justify-center gap-2"
                 >
-                  <Edit2 size={18} />
+                    {editingId ? <Check size={20} /> : <Plus size={20} />}
+                    {editingId ? t('save') : t('addUnit')}
                 </button>
-                <button 
-                  type="button"
-                  onClick={(e) => handleDeleteClick(e, unit)}
-                  className="p-2 bg-gray-100 dark:bg-slate-700 hover:bg-red-100 dark:hover:bg-red-900 text-gray-600 dark:text-gray-300 hover:text-red-600 rounded-lg transition-colors cursor-pointer"
-                  title="Delete"
-                >
-                  <Trash2 size={18} />
-                </button>
-              </div>
+                {editingId && (
+                    <button type="button" onClick={cancelEdit} className="w-full mt-2 text-gray-400 text-sm font-bold hover:text-gray-600">Cancel</button>
+                )}
+                </div>
+            </form>
             </div>
-          ))}
         </div>
+
       </div>
 
-      {/* Custom Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal */}
       {unitToDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="glass bg-white dark:bg-slate-900 w-full max-w-md p-8 rounded-3xl shadow-2xl animate-in fade-in zoom-in duration-200 border border-red-100 dark:border-red-900/30">
-            
-            <div className="flex flex-col items-center text-center">
-                <div className="p-4 bg-red-100 dark:bg-red-900/20 text-red-600 rounded-full mb-6 ring-8 ring-red-50 dark:ring-red-900/10">
-                    {isDeleting ? <Loader2 size={36} className="animate-spin" /> : <AlertTriangle size={36} strokeWidth={2.5} />}
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Delete {unitToDelete.name}?</h3>
-                
-                {/* Impact Analysis */}
-                <div className="text-sm text-gray-500 dark:text-gray-400 mb-8 w-full">
-                    {state.bookings.some(b => b.unit_id === unitToDelete.id) ? (
-                        <div className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-800/50">
-                            <p className="font-bold text-red-700 dark:text-red-400 mb-1">
-                                ⚠️ Critical Warning
-                            </p>
-                            <p className="text-red-600/90 dark:text-red-300/80 leading-relaxed">
-                                This unit has <span className="font-bold">{state.bookings.filter(b => b.unit_id === unitToDelete.id).length} active booking(s)</span> and associated financial records. 
-                                <br/><br/>
-                                Deleting it will <span className="font-extrabold underline">PERMANENTLY REMOVE</span> all history, revenue data, and scheduled bookings related to this unit.
-                            </p>
-                        </div>
-                    ) : (
-                        <p className="leading-relaxed">
-                            Are you sure you want to remove this unit? <br/>
-                            This action cannot be undone.
-                        </p>
-                    )}
-                </div>
-
-                <div className="flex gap-3 w-full">
-                    <button 
-                        type="button"
-                        onClick={() => setUnitToDelete(null)}
-                        disabled={isDeleting}
-                        className="flex-1 p-3.5 rounded-xl border border-gray-200 dark:border-gray-700 font-bold hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors text-gray-700 dark:text-gray-300 disabled:opacity-50"
-                    >
-                        {t('cancel')}
-                    </button>
-                    <button 
-                        type="button"
-                        onClick={confirmDelete}
-                        disabled={isDeleting}
-                        className="flex-1 p-3.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold shadow-lg shadow-red-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                        {isDeleting ? 'Deleting...' : (
-                            <>
-                                <Trash2 size={18} />
-                                Delete Unit
-                            </>
-                        )}
-                    </button>
-                </div>
+          <div className="bg-white dark:bg-slate-900 w-full max-w-sm p-6 rounded-3xl shadow-2xl border border-gray-100 dark:border-slate-800">
+            <h3 className="text-xl font-bold text-center mb-2 text-gray-900 dark:text-white">Delete Unit?</h3>
+            <p className="text-center text-gray-500 dark:text-gray-400 text-sm mb-6">This will permanently remove {unitToDelete.name}.</p>
+            <div className="flex gap-3">
+                <button onClick={() => setUnitToDelete(null)} disabled={isDeleting} className="flex-1 p-3 rounded-xl border border-gray-200 dark:border-slate-700 font-bold hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300">{t('cancel')}</button>
+                <button onClick={confirmDelete} disabled={isDeleting} className="flex-1 p-3 rounded-xl bg-red-500 text-white font-bold hover:bg-red-600">Delete</button>
             </div>
-
           </div>
         </div>
       )}

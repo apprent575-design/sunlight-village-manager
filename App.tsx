@@ -10,6 +10,7 @@ import { Expenses } from './components/Expenses';
 import { Reports } from './components/Reports';
 import { Units } from './components/Units';
 import { Settings } from './components/Settings';
+import { FeaturesGuide } from './components/FeaturesGuide';
 import { Auth } from './components/Auth';
 import { AdminAccounts } from './components/AdminAccounts';
 import { AdminSubscriptions } from './components/AdminSubscriptions';
@@ -58,6 +59,7 @@ const AppContent = () => {
                  <Route path="/expenses" element={<Expenses />} />
                  <Route path="/reports" element={<Reports />} />
                  <Route path="/units" element={<Units />} />
+                 <Route path="/features" element={<FeaturesGuide />} />
                  <Route path="*" element={<Navigate to="/" replace />} />
                </>
             )}

@@ -2,10 +2,10 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Moon, Sun, Globe, Shield, User, Check, AlertCircle, Loader2, CreditCard, Clock, Calendar } from 'lucide-react';
-import { format, addDays, parseISO } from 'date-fns';
+import { format, addDays } from 'date-fns';
 
 export const Settings = () => {
-  const { t, theme, toggleTheme, language, setLanguage, updatePassword, user, hasValidSubscription, daysRemaining, isAdmin } = useApp();
+  const { t, theme, toggleTheme, language, setLanguage, updatePassword, user, hasValidSubscription, daysRemaining, isAdmin, dateSettings, setDateSettings, formatDate } = useApp();
   
   // Password Change State
   const [newPassword, setNewPassword] = useState('');
@@ -15,7 +15,8 @@ export const Settings = () => {
 
   // Subscription Info
   const sub = user?.subscription;
-  const endDate = sub ? addDays(parseISO(sub.start_date), sub.duration_days) : null;
+  // Use new Date instead of parseISO
+  const endDate = sub ? addDays(new Date(sub.start_date), sub.duration_days) : null;
   const isPaused = sub?.status === 'paused';
 
   const handlePasswordChange = async (e: React.FormEvent) => {
@@ -194,6 +195,54 @@ export const Settings = () => {
                         className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${language === 'ar' ? 'bg-white dark:bg-slate-600 shadow-sm text-primary-600 dark:text-white transform scale-105' : 'text-gray-500 dark:text-gray-400'}`}
                     >
                         AR
+                    </button>
+                </div>
+             </div>
+        </div>
+
+        {/* Date & Time Settings */}
+        <div className="glass p-8 rounded-3xl flex flex-col justify-center space-y-8">
+             <div className="flex items-center gap-4 mb-2">
+                 <div className="p-3 bg-purple-100 dark:bg-slate-700 text-purple-600 dark:text-purple-400 rounded-2xl shadow-sm">
+                     <Calendar size={24} />
+                 </div>
+                 <div>
+                     <h4 className="font-bold text-gray-800 dark:text-white text-lg">{language === 'ar' ? 'عرض التاريخ' : 'Date Display'}</h4>
+                     <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(new Date())}</p>
+                 </div>
+             </div>
+
+             {/* Date Language */}
+             <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-gray-700 dark:text-gray-300">{language === 'ar' ? 'لغة التاريخ' : 'Date Language'}</span>
+                <div className="flex bg-gray-100 dark:bg-slate-800 p-1 rounded-xl border border-gray-200 dark:border-gray-700">
+                    {['match', 'en', 'ar'].map((opt) => (
+                        <button 
+                            key={opt}
+                            onClick={() => setDateSettings({...dateSettings, language: opt as any})}
+                            className={`px-3 py-1 text-xs font-bold rounded-lg transition-all capitalize ${dateSettings.language === opt ? 'bg-white dark:bg-slate-600 shadow-sm text-primary-600 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
+                        >
+                            {opt === 'match' ? (language === 'ar' ? 'تلقائي' : 'Auto') : opt.toUpperCase()}
+                        </button>
+                    ))}
+                </div>
+             </div>
+
+             {/* Month Format */}
+             <div className="flex items-center justify-between">
+                <span className="text-sm font-bold text-gray-700 dark:text-gray-300">{language === 'ar' ? 'تنسيق الأشهر' : 'Month Format'}</span>
+                <div className="flex bg-gray-100 dark:bg-slate-800 p-1 rounded-xl border border-gray-200 dark:border-gray-700">
+                    <button 
+                        onClick={() => setDateSettings({...dateSettings, format: 'names'})}
+                        className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${dateSettings.format === 'names' ? 'bg-white dark:bg-slate-600 shadow-sm text-primary-600 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
+                    >
+                        {language === 'ar' ? 'أسماء' : 'Names'}
+                    </button>
+                    <button 
+                        onClick={() => setDateSettings({...dateSettings, format: 'numbers'})}
+                        className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${dateSettings.format === 'numbers' ? 'bg-white dark:bg-slate-600 shadow-sm text-primary-600 dark:text-white' : 'text-gray-500 dark:text-gray-400'}`}
+                    >
+                        {language === 'ar' ? 'أرقام' : 'Numbers'}
                     </button>
                 </div>
              </div>

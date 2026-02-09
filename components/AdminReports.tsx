@@ -2,7 +2,7 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
 import { FileText, Download, TrendingUp, Users } from 'lucide-react';
-import { format, addDays, parseISO, isAfter } from 'date-fns';
+import { format, addDays, isAfter } from 'date-fns';
 import { generateAdminReport } from '../utils/pdfGenerator';
 
 export const AdminReports = () => {
@@ -12,7 +12,7 @@ export const AdminReports = () => {
   const clients = state.allUsers.filter(u => u.role !== 'admin');
   const activeSubs = clients.filter(u => {
      if(!u.subscription) return false;
-     const end = addDays(parseISO(u.subscription.start_date), u.subscription.duration_days);
+     const end = addDays(new Date(u.subscription.start_date), u.subscription.duration_days);
      return isAfter(end, new Date()) && u.subscription.status !== 'paused';
   }).length;
   const totalRevenue = clients.reduce((sum, u) => sum + (u.subscription?.price || 0), 0);

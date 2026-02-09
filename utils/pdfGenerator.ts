@@ -2,7 +2,20 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Booking, Unit, Expense, Language, BookingStatus, User, Subscription } from '../types';
-import { format, addDays, parseISO, isAfter, differenceInDays, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { format, addDays, isAfter, differenceInDays, isWithinInterval } from 'date-fns';
+
+// Helper functions to replace date-fns imports that might be missing in specific environments
+const parseISO = (dateStr: string) => new Date(dateStr);
+const startOfDay = (date: Date) => {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+const endOfDay = (date: Date) => {
+  const d = new Date(date);
+  d.setHours(23, 59, 59, 999);
+  return d;
+};
 
 const generatePdfFromHtml = async (htmlContent: string, fileName: string, isRTL: boolean) => {
   const container = document.createElement('div');
@@ -406,7 +419,7 @@ export const generateOccupancyReport = async (
                 <td style="padding: 10px; font-weight: bold; color: #1e293b;">${b.tenant_name}</td>
                 <td style="padding: 10px; color: #475569; font-size: 11px;">${b.phone}</td>
                 <td style="padding: 10px; color: #334155; font-size: 11px;">${format(new Date(b.start_date), 'yyyy-MM-dd')}<br/>${format(new Date(b.end_date), 'yyyy-MM-dd')}</td>
-                <td style="padding: 10px; text-align: center;">${b.nights}</td>
+                <td style="padding: 10px; text-align: center; font-weight: bold; color: #0f172a;">${b.nights}</td>
                 <td style="padding: 10px; text-align: ${isRTL ? 'left' : 'right'}; font-weight: 600; color: #0284c7;">${baseRent.toLocaleString()}</td>
                 <td style="padding: 10px; text-align: ${isRTL ? 'left' : 'right'}; color: #64748b;">${fees.toLocaleString()}</td>
                 <td style="padding: 10px; text-align: ${isRTL ? 'left' : 'right'}; color: #d97706;">${hk.toLocaleString()}</td>
@@ -448,13 +461,13 @@ export const generateOccupancyReport = async (
                             <th style="text-align: ${isRTL ? 'right' : 'left'}; padding: 10px; width: 14%;">${labels.tenant}</th>
                             <th style="text-align: ${isRTL ? 'right' : 'left'}; padding: 10px; width: 8%;">${labels.phone}</th>
                             <th style="text-align: ${isRTL ? 'right' : 'left'}; padding: 10px; width: 10%;">${labels.dates}</th>
-                            <th style="text-align: center; padding: 10px; width: 4%;">${labels.nights}</th>
+                            <th style="text-align: center; padding: 10px; width: 8%; font-weight: 800; color: #000;">${labels.nights}</th>
                             <th style="text-align: ${isRTL ? 'left' : 'right'}; padding: 10px; width: 11%;">${labels.baseRent}<br/><span style="font-size:9px; font-weight:normal;">${labels.baseRentDesc}</span></th>
                             <th style="text-align: ${isRTL ? 'left' : 'right'}; padding: 10px; width: 9%;">${labels.villageFees}</th>
                             <th style="text-align: ${isRTL ? 'left' : 'right'}; padding: 10px; width: 9%;">${labels.housekeeping}</th>
                             <th style="text-align: ${isRTL ? 'left' : 'right'}; padding: 10px; width: 12%; background-color: #f8fafc;">${labels.grandTotal}</th>
-                            <th style="text-align: center; padding: 10px; width: 11%;">${labels.payment}</th>
-                            <th style="text-align: center; padding: 10px; width: 12%;">${labels.status}</th>
+                            <th style="text-align: center; padding: 10px; width: 10%;">${labels.payment}</th>
+                            <th style="text-align: center; padding: 10px; width: 9%;">${labels.status}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -561,7 +574,7 @@ export const generateVillageFeesReport = async (
             <tr style="border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
                 <td style="padding: 10px; font-weight: bold; color: #1e293b;">${b.tenant_name}</td>
                 <td style="padding: 10px; color: #334155; font-size: 11px;">${format(new Date(b.start_date), 'yyyy-MM-dd')} / ${format(new Date(b.end_date), 'yyyy-MM-dd')}</td>
-                <td style="padding: 10px; text-align: center;">${b.nights}</td>
+                <td style="padding: 10px; text-align: center; font-weight: bold; color: #000;">${b.nights}</td>
                 <td style="padding: 10px; text-align: ${isRTL ? 'left' : 'right'}; color: #475569;">${b.village_fee || 0}</td>
                 <td style="padding: 10px; text-align: ${isRTL ? 'left' : 'right'}; font-weight: bold; color: #d97706;">${fees.toLocaleString()}</td>
             </tr>
@@ -590,7 +603,7 @@ export const generateVillageFeesReport = async (
                         <tr>
                             <th style="text-align: ${isRTL ? 'right' : 'left'}; padding: 10px; width: 25%;">${labels.tenant}</th>
                             <th style="text-align: ${isRTL ? 'right' : 'left'}; padding: 10px; width: 25%;">${labels.dates}</th>
-                            <th style="text-align: center; padding: 10px; width: 15%;">${labels.nights}</th>
+                            <th style="text-align: center; padding: 10px; width: 15%; font-weight: 800; color: #000;">${labels.nights}</th>
                             <th style="text-align: ${isRTL ? 'left' : 'right'}; padding: 10px; width: 15%;">${labels.dailyFee}</th>
                             <th style="text-align: ${isRTL ? 'left' : 'right'}; padding: 10px; width: 20%;">${labels.totalFee}</th>
                         </tr>
@@ -882,6 +895,7 @@ export const generateFinancialReport = async (
     filterUnitId?: string
 ) => {
     const isRTL = lang === 'ar';
+    const reportDate = format(new Date(), 'dd MMMM yyyy');
     const periodLabel = getReportPeriodLabel(filterStart || '', filterEnd || '', t);
 
     // Apply Filters
@@ -915,10 +929,11 @@ export const generateFinancialReport = async (
 
     const labels = isRTL ? {
         title: 'الملخص المالي',
-        generated: 'تم الإنشاء',
+        subtitle: 'تحليل الإيرادات والمصروفات وصافي الربح',
+        generated: 'تاريخ التقرير',
         reportPeriod: 'فترة التقرير',
         summary: 'ملخص عام',
-        revenue: 'إجمالي الإيرادات (الإيجار الأساسي)',
+        revenue: 'إجمالي الإيرادات',
         expenses: 'إجمالي المصروفات',
         netProfit: 'صافي الربح',
         details: 'تفاصيل حسب الوحدة',
@@ -927,13 +942,15 @@ export const generateFinancialReport = async (
         unitRev: 'إيراد',
         unitExp: 'مصروفات',
         unitNet: 'صافي',
-        currency: 'ج.م'
+        currency: 'ج.م',
+        footer: 'الملخص المالي - نظام صن لايت'
     } : {
         title: 'Financial Summary Report',
-        generated: 'Generated',
+        subtitle: 'Analysis of Revenue, Expenses, and Net Profit',
+        generated: 'Report Date',
         reportPeriod: 'Report Period',
         summary: 'Executive Summary',
-        revenue: 'Total Revenue (Base Rent)',
+        revenue: 'Total Revenue',
         expenses: 'Total Expenses',
         netProfit: 'Net Profit',
         details: 'Details by Unit',
@@ -942,7 +959,8 @@ export const generateFinancialReport = async (
         unitRev: 'Revenue',
         unitExp: 'Expenses',
         unitNet: 'Net',
-        currency: 'EGP'
+        currency: 'EGP',
+        footer: 'Financial Report - Sunlight System'
     };
 
     const unitRows = displayedUnits.map(u => {
@@ -953,58 +971,75 @@ export const generateFinancialReport = async (
         const uExpTotal = uExpenses.reduce((sum, e) => sum + e.amount, 0);
         
         const uNet = uRev - uExpTotal;
-        const netColor = uNet >= 0 ? '#16a34a' : '#dc2626';
+        const netColor = uNet >= 0 ? '#166534' : '#dc2626'; // Green for positive, Red for negative
+        const netBg = uNet >= 0 ? '#dcfce7' : '#fee2e2';
 
         return `
-         <tr style="border-bottom: 1px solid #e2e8f0;">
+         <tr style="border-bottom: 1px solid #e2e8f0; background-color: #ffffff;">
             <td style="padding: 12px; font-weight: bold; color: #1e293b;">${u.name}</td>
-            <td style="padding: 12px; text-align: center;">${uBookings.length}</td>
-            <td style="padding: 12px; text-align: ${isRTL ? 'left' : 'right'}; color: #166534;">${uRev.toLocaleString()}</td>
-            <td style="padding: 12px; text-align: ${isRTL ? 'left' : 'right'}; color: #dc2626;">${uExpTotal.toLocaleString()}</td>
-            <td style="padding: 12px; text-align: ${isRTL ? 'left' : 'right'}; font-weight: bold; color: ${netColor}; background-color: #f8fafc;">${uNet.toLocaleString()}</td>
+            <td style="padding: 12px; text-align: center; color: #475569; font-weight: bold;">${uBookings.length}</td>
+            <td style="padding: 12px; text-align: ${isRTL ? 'left' : 'right'}; font-weight: bold; color: #0284c7;">${uRev.toLocaleString()}</td>
+            <td style="padding: 12px; text-align: ${isRTL ? 'left' : 'right'}; font-weight: bold; color: #d97706;">${uExpTotal.toLocaleString()}</td>
+            <td style="padding: 12px; text-align: ${isRTL ? 'left' : 'right'};">
+                <span style="font-weight: bold; color: ${netColor}; background: ${netBg}; padding: 4px 10px; border-radius: 6px; display: inline-block; min-width: 80px; text-align: center;">
+                    ${uNet.toLocaleString()}
+                </span>
+            </td>
          </tr>
         `;
     }).join('');
 
     const html = `
     <div style="font-family: 'Cairo', sans-serif; padding: 40px; color: #1f2937; direction: ${isRTL ? 'rtl' : 'ltr'};">
-         <h1 style="color: #0284c7; font-size: 28px; font-weight: 800; margin-bottom: 5px;">${labels.title}</h1>
-         <p style="color: #64748b; margin-bottom: 30px; font-size: 12px;">${labels.generated}: ${format(new Date(), 'yyyy-MM-dd HH:mm')}</p>
-         ${filterStart && filterEnd ? `<p style="margin-bottom: 20px; color: #0f172a; font-size: 13px; font-weight: bold; background: #f0f9ff; display: inline-block; padding: 4px 10px; border-radius: 5px;">${labels.reportPeriod}: ${periodLabel}</p>` : ''}
-
-         <div style="background: #f8fafc; padding: 20px; border-radius: 12px; border: 1px solid #e2e8f0; margin-bottom: 30px;">
-             <h3 style="margin-top: 0; color: #0f172a;">${labels.summary}</h3>
-             <div style="display: flex; gap: 20px; justify-content: space-around; margin-top: 20px;">
-                <div style="text-align: center;">
-                    <div style="font-size: 12px; color: #64748b; font-weight: bold; text-transform: uppercase;">${labels.revenue}</div>
-                    <div style="font-size: 24px; font-weight: 800; color: #16a34a;">${totalRevenue.toLocaleString()} ${labels.currency}</div>
-                </div>
-                 <div style="text-align: center;">
-                    <div style="font-size: 12px; color: #64748b; font-weight: bold; text-transform: uppercase;">${labels.expenses}</div>
-                    <div style="font-size: 24px; font-weight: 800; color: #dc2626;">${totalExpenses.toLocaleString()} ${labels.currency}</div>
-                </div>
-                 <div style="text-align: center;">
-                    <div style="font-size: 12px; color: #64748b; font-weight: bold; text-transform: uppercase;">${labels.netProfit}</div>
-                    <div style="font-size: 24px; font-weight: 800; color: #0284c7;">${netProfit.toLocaleString()} ${labels.currency}</div>
-                </div>
-             </div>
+         
+         <!-- Header -->
+         <div style="text-align: center; margin-bottom: 40px; border-bottom: 3px solid #0284c7; padding-bottom: 20px;">
+             <h1 style="color: #0369a1; font-size: 32px; font-weight: 800; margin: 0;">${labels.title}</h1>
+             <p style="margin: 5px 0; color: #64748b; font-size: 14px; font-weight: 600;">${labels.subtitle}</p>
+             <p style="margin: 5px 0; color: #94a3b8; font-size: 12px;">${labels.generated}: ${reportDate}</p>
+             ${filterStart && filterEnd ? `<p style="margin: 5px 0; color: #0f172a; font-size: 13px; font-weight: bold; background: #f0f9ff; display: inline-block; padding: 4px 10px; border-radius: 5px; border: 1px solid #bae6fd;">${labels.reportPeriod}: ${periodLabel}</p>` : ''}
          </div>
 
-         <h3 style="color: #0f172a; margin-bottom: 15px;">${labels.details}</h3>
-         <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-            <thead style="background: #f1f5f9; color: #475569;">
-                <tr>
-                    <th style="padding: 12px; text-align: ${isRTL ? 'right' : 'left'}; width: 25%;">${labels.unit}</th>
-                    <th style="padding: 12px; text-align: center; width: 10%;">${labels.bookings}</th>
-                    <th style="padding: 12px; text-align: ${isRTL ? 'left' : 'right'}; width: 20%;">${labels.unitRev}</th>
-                    <th style="padding: 12px; text-align: ${isRTL ? 'left' : 'right'}; width: 20%;">${labels.unitExp}</th>
-                    <th style="padding: 12px; text-align: ${isRTL ? 'left' : 'right'}; width: 25%; background-color: #f8fafc;">${labels.unitNet}</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${unitRows}
-            </tbody>
-         </table>
+         <!-- Summary Cards -->
+         <div style="display: flex; gap: 20px; justify-content: space-between; margin-bottom: 40px;">
+            <div style="flex: 1; background: #f0f9ff; padding: 20px; border-radius: 12px; border: 1px solid #bae6fd; text-align: center;">
+                <div style="font-size: 12px; color: #0369a1; font-weight: bold; text-transform: uppercase;">${labels.revenue}</div>
+                <div style="font-size: 24px; font-weight: 800; color: #0284c7; margin-top: 5px;">${totalRevenue.toLocaleString()} <span style="font-size: 14px;">${labels.currency}</span></div>
+            </div>
+             <div style="flex: 1; background: #fff7ed; padding: 20px; border-radius: 12px; border: 1px solid #fed7aa; text-align: center;">
+                <div style="font-size: 12px; color: #c2410c; font-weight: bold; text-transform: uppercase;">${labels.expenses}</div>
+                <div style="font-size: 24px; font-weight: 800; color: #ea580c; margin-top: 5px;">${totalExpenses.toLocaleString()} <span style="font-size: 14px;">${labels.currency}</span></div>
+            </div>
+             <div style="flex: 1; background: #f0fdf4; padding: 20px; border-radius: 12px; border: 1px solid #bbf7d0; text-align: center;">
+                <div style="font-size: 12px; color: #15803d; font-weight: bold; text-transform: uppercase;">${labels.netProfit}</div>
+                <div style="font-size: 24px; font-weight: 800; color: #16a34a; margin-top: 5px;">${netProfit.toLocaleString()} <span style="font-size: 14px;">${labels.currency}</span></div>
+            </div>
+         </div>
+
+         <!-- Detailed Table -->
+         <div style="border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; margin-bottom: 30px;">
+             <div style="background: #f1f5f9; padding: 12px 20px; border-bottom: 1px solid #e2e8f0;">
+                <h3 style="margin: 0; color: #334155; font-size: 16px; font-weight: 800;">${labels.details}</h3>
+             </div>
+             <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+                <thead style="background: #ffffff; color: #475569; border-bottom: 2px solid #e2e8f0;">
+                    <tr>
+                        <th style="padding: 12px; text-align: ${isRTL ? 'right' : 'left'}; width: 25%; font-weight: 800;">${labels.unit}</th>
+                        <th style="padding: 12px; text-align: center; width: 10%; font-weight: 800;">${labels.bookings}</th>
+                        <th style="padding: 12px; text-align: ${isRTL ? 'left' : 'right'}; width: 20%; font-weight: 800;">${labels.unitRev}</th>
+                        <th style="padding: 12px; text-align: ${isRTL ? 'left' : 'right'}; width: 20%; font-weight: 800;">${labels.unitExp}</th>
+                        <th style="padding: 12px; text-align: ${isRTL ? 'left' : 'right'}; width: 25%; background-color: #f8fafc; font-weight: 800;">${labels.unitNet}</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${unitRows}
+                </tbody>
+             </table>
+         </div>
+
+         <div style="margin-top: 50px; text-align: center; font-size: 11px; color: #94a3b8; font-weight: 600;">
+            ${labels.footer}
+         </div>
     </div>
     `;
 

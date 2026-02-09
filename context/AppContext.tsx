@@ -1,18 +1,34 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { AppState, Language, Theme, Unit, Booking, Expense, User, Subscription } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { addDays, isAfter, differenceInDays, parseISO } from 'date-fns';
+import { addDays, isAfter, differenceInDays, format, isValid } from 'date-fns';
+import { arSA, enUS } from 'date-fns/locale';
 
 // --- CONFIGURATION ---
 const SUPER_ADMIN_EMAIL = 'admin@gmail.com';
+
+// Fix: Define Locale type from the imported object as it might not be exported by 'date-fns' directly
+type Locale = typeof enUS;
+
+interface DateSettings {
+  language: 'match' | 'en' | 'ar';
+  format: 'names' | 'numbers';
+}
 
 interface AppContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
   theme: Theme;
   toggleTheme: () => void;
+  
+  // Date Settings
+  dateSettings: DateSettings;
+  setDateSettings: (settings: DateSettings) => void;
+  dateLocale: Locale;
+  formatDate: (date: Date | string | number) => string;
+  formatHeaderDate: (date: Date | string | number) => string;
+
   user: User | null;
   login: (email: string, password?: string) => Promise<void>;
   signup: (email: string, password?: string, fullName?: string) => Promise<void>;
@@ -61,6 +77,35 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     return (saved === 'dark' || saved === 'light') ? saved : 'light';
   });
 
+  const [dateSettings, setDateSettingsState] = useState<DateSettings>(() => {
+    const saved = localStorage.getItem('dateSettings');
+    return saved ? JSON.parse(saved) : { language: 'match', format: 'names' };
+  });
+
+  const setDateSettings = (settings: DateSettings) => {
+      setDateSettingsState(settings);
+      localStorage.setItem('dateSettings', JSON.stringify(settings));
+  };
+
+  // Derived Date Logic
+  const effectiveDateLang = dateSettings.language === 'match' ? language : dateSettings.language;
+  const dateLocale = effectiveDateLang === 'ar' ? arSA : enUS;
+
+  const formatDate = (date: Date | string | number) => {
+      const d = new Date(date);
+      if (!isValid(d)) return 'Invalid';
+      // MMMM for full month name
+      const fmt = dateSettings.format === 'names' ? 'dd MMMM yyyy' : 'dd/MM/yyyy';
+      return format(d, fmt, { locale: dateLocale });
+  };
+
+  const formatHeaderDate = (date: Date | string | number) => {
+      const d = new Date(date);
+      if (!isValid(d)) return '';
+      const fmt = dateSettings.format === 'names' ? 'EEEE, d MMMM yyyy' : 'EEEE, dd/MM/yyyy';
+      return format(d, fmt, { locale: dateLocale });
+  };
+
   // --- State ---
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -88,7 +133,8 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     if (!user?.subscription) return { isValid: false, days: 0, exists: false };
     if (user.subscription.status === 'paused') return { isValid: false, days: 0, exists: true };
 
-    const start = parseISO(user.subscription.start_date);
+    // Manual parse for ISO string
+    const start = new Date(user.subscription.start_date);
     const end = addDays(start, user.subscription.duration_days);
     const today = new Date();
     const isValid = isAfter(end, today);
@@ -417,9 +463,27 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   // --- Data CRUD ---
   const checkRestriction = () => {
       if (isAdmin) return;
-      if (!subExists) throw new Error(language === 'ar' ? 'غير مسموح. أنت غير مشترك في الخدمة.' : 'Access Denied. No subscription.');
-      if (user?.subscription?.status === 'paused') throw new Error(language === 'ar' ? 'اشتراكك موقوف مؤقتاً.' : 'Subscription paused.');
-      if (!hasValidSubscription) throw new Error(language === 'ar' ? 'عفواً، انتهت صلاحية اشتراكك.' : 'Subscription expired.');
+
+      // 1. Not Subscribed
+      if (!subExists) {
+          throw new Error(language === 'ar' 
+             ? 'عفواً، أنت غير مشترك في الخدمة. يرجى التواصل مع الإدارة.' 
+             : 'Access Denied. You do not have an active subscription.');
+      }
+
+      // 2. Paused
+      if (user?.subscription?.status === 'paused') {
+          throw new Error(language === 'ar' 
+             ? 'عفواً، اشتراكك موقوف مؤقتاً. يرجى تفعيل الاشتراك لإضافة بيانات جديدة.' 
+             : 'Your subscription is currently paused. Please resume it to add data.');
+      }
+
+      // 3. Expired
+      if (!hasValidSubscription) {
+          throw new Error(language === 'ar' 
+             ? 'عفواً، لقد انتهت صلاحية اشتراكك. يرجى التجديد للمتابعة.' 
+             : 'Your subscription has expired. Please renew to continue.');
+      }
   };
 
   const addBooking = async (booking: Booking) => {
@@ -497,6 +561,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   return (
     <AppContext.Provider value={{
       language, setLanguage, theme, toggleTheme: () => setTheme(prev => prev === 'light' ? 'dark' : 'light'),
+      dateSettings, setDateSettings, dateLocale, formatDate, formatHeaderDate,
       user, login, signup, updatePassword, logout,
       state: { units, bookings, expenses, allUsers },
       addBooking, updateBooking, deleteBooking,

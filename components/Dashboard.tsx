@@ -1,8 +1,8 @@
 
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { Calendar, DollarSign, TrendingUp, Users, Clock, CreditCard, Activity, AlertCircle, CheckCircle as CheckIcon, XCircle, PauseCircle } from 'lucide-react';
-import { format, isValid, addDays, parseISO, isAfter, differenceInDays } from 'date-fns';
+import { Calendar, DollarSign, TrendingUp, Users, Clock, CreditCard, Activity, AlertCircle, CheckCircle as CheckIcon, XCircle, PauseCircle, ChevronsRight } from 'lucide-react';
+import { isValid, addDays, isAfter, differenceInDays } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 
 const StatCard = ({ title, value, icon: Icon, gradient, trend }: any) => (
@@ -32,7 +32,7 @@ const StatCard = ({ title, value, icon: Icon, gradient, trend }: any) => (
 );
 
 export const Dashboard = () => {
-  const { t, state, user, isAdmin } = useApp();
+  const { t, state, user, isAdmin, isRTL, formatDate, formatHeaderDate, language } = useApp();
   const navigate = useNavigate();
 
   // Helper icon component for Admin dash
@@ -44,13 +44,13 @@ export const Dashboard = () => {
       
       const activeSubs = allClients.filter(u => {
           if (!u.subscription) return false;
-          const end = addDays(parseISO(u.subscription.start_date), u.subscription.duration_days);
+          const end = addDays(new Date(u.subscription.start_date), u.subscription.duration_days);
           return isAfter(end, new Date()) && u.subscription.status !== 'paused';
       }).length;
 
       const expiredSubs = allClients.filter(u => {
           if (!u.subscription) return false;
-          const end = addDays(parseISO(u.subscription.start_date), u.subscription.duration_days);
+          const end = addDays(new Date(u.subscription.start_date), u.subscription.duration_days);
           return !isAfter(end, new Date()) || u.subscription.status === 'paused';
       }).length;
 
@@ -67,8 +67,8 @@ export const Dashboard = () => {
                         Overview & Client Status
                     </p>
                 </div>
-                <div className="text-sm font-medium text-gray-400 bg-white/60 dark:bg-slate-800/60 px-5 py-2.5 rounded-2xl border border-white dark:border-gray-700 shadow-sm backdrop-blur-sm">
-                    {format(new Date(), 'EEEE, d MMMM yyyy')}
+                <div className="text-sm font-medium text-gray-400 bg-white/60 dark:bg-slate-800/60 px-5 py-2.5 rounded-2xl border border-white dark:border-gray-700 shadow-sm backdrop-blur-sm capitalize">
+                    {formatHeaderDate(new Date())}
                 </div>
             </div>
 
@@ -143,8 +143,8 @@ export const Dashboard = () => {
                                 let StatusIcon = AlertCircle;
 
                                 if (sub) {
-                                    const end = addDays(parseISO(sub.start_date), sub.duration_days);
-                                    expiryDate = format(end, 'MMM dd, yyyy');
+                                    const end = addDays(new Date(sub.start_date), sub.duration_days);
+                                    expiryDate = formatDate(end);
                                     daysLeft = differenceInDays(end, new Date());
                                     
                                     if (sub.status === 'paused') {
@@ -205,11 +205,9 @@ export const Dashboard = () => {
   }
 
   // --- USER LOGIC (Rental Focused) ---
-  // Reusing previous logic for normal users
   
   const activeBookings = state.bookings.filter(b => b.status === 'Confirmed' || b.status === 'Pending').length;
   
-  // Calculate Net Profit
   const totalRentalRevenue = state.bookings
     .filter(b => b.status === 'Confirmed')
     .reduce((sum, b) => sum + (b.nightly_rate * b.nights), 0);
@@ -217,15 +215,9 @@ export const Dashboard = () => {
   const totalExpenses = state.expenses.reduce((sum, e) => sum + e.amount, 0);
   const netProfit = totalRentalRevenue - totalExpenses;
 
-  // Active or Upcoming rentals
   const rentals = state.bookings
     .sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
     .slice(0, 10);
-
-  const formatDateSafe = (dateStr: string) => {
-    const d = new Date(dateStr);
-    return isValid(d) ? format(d, 'MMM dd') : 'Invalid';
-  };
   
   return (
     <div className="space-y-8">
@@ -239,8 +231,8 @@ export const Dashboard = () => {
                 Welcome back, <span className="text-primary-600 dark:text-primary-400 font-bold">{user?.full_name}</span> 👋
             </p>
         </div>
-        <div className="text-sm font-medium text-gray-400 bg-white/60 dark:bg-slate-800/60 px-5 py-2.5 rounded-2xl border border-white dark:border-gray-700 shadow-sm backdrop-blur-sm">
-            {format(new Date(), 'EEEE, d MMMM yyyy')}
+        <div className="text-sm font-medium text-gray-400 bg-white/60 dark:bg-slate-800/60 px-5 py-2.5 rounded-2xl border border-white dark:border-gray-700 shadow-sm backdrop-blur-sm capitalize">
+            {formatHeaderDate(new Date())}
         </div>
       </div>
 
@@ -268,7 +260,7 @@ export const Dashboard = () => {
       </div>
 
       {/* Recent Activity Table */}
-      <div className="glass rounded-3xl overflow-hidden shadow-card border border-white/50 dark:border-white/5">
+      <div className="glass rounded-3xl overflow-hidden shadow-card border border-white/50 dark:border-white/5 relative">
         <div className="p-6 border-b border-gray-100 dark:border-gray-700/50 flex items-center justify-between bg-white/40 dark:bg-slate-800/40">
             <div className="flex items-center gap-3">
                 <div className="p-2.5 bg-primary-100 dark:bg-primary-900/30 text-primary-600 rounded-xl">
@@ -276,9 +268,16 @@ export const Dashboard = () => {
                 </div>
                 <h3 className="text-xl font-bold text-gray-800 dark:text-white">{t('rentalOverview')}</h3>
             </div>
+            
+            {/* Swipe hint for mobile */}
+            <div className="md:hidden flex items-center gap-1 text-[10px] text-gray-400 animate-pulse font-bold">
+               <span>{language === 'ar' ? 'اسحب للمزيد' : 'Swipe for more'}</span>
+               <ChevronsRight size={12} className={isRTL ? 'rotate-180' : ''}/>
+            </div>
+
             <button 
               onClick={() => navigate('/bookings')}
-              className="text-sm font-bold text-primary-600 hover:text-primary-700 transition-colors bg-primary-50 dark:bg-primary-900/10 px-4 py-2 rounded-xl"
+              className="hidden md:block text-sm font-bold text-primary-600 hover:text-primary-700 transition-colors bg-primary-50 dark:bg-primary-900/10 px-4 py-2 rounded-xl"
             >
               View All
             </button>
@@ -309,10 +308,10 @@ export const Dashboard = () => {
                     </td>
                     <td className="p-5 font-medium text-gray-600 dark:text-gray-400">{rental.tenant_name}</td>
                     <td className="p-5 text-sm text-gray-500">
-                      <div className="flex items-center gap-2 bg-gray-100 dark:bg-slate-800 w-fit px-3 py-1 rounded-lg border border-gray-200 dark:border-gray-700">
-                          <span>{formatDateSafe(rental.start_date)}</span>
-                          <span className="text-gray-300">→</span>
-                          <span>{formatDateSafe(rental.end_date)}</span>
+                      <div className="flex items-center gap-2 bg-gray-100 dark:bg-slate-800 w-fit px-3 py-1 rounded-lg border border-gray-200 dark:border-gray-700 dir-ltr">
+                          <span>{formatDate(rental.start_date)}</span>
+                          <span className="text-gray-300 mx-1">{isRTL ? '←' : '→'}</span>
+                          <span>{formatDate(rental.end_date)}</span>
                       </div>
                     </td>
                     <td className="p-5 text-center">

@@ -1,8 +1,7 @@
-
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Mail, Search, Shield, Home, BookOpen, CheckCircle, XCircle } from 'lucide-react';
-import { addDays, parseISO, isAfter } from 'date-fns';
+import { Mail, Search, Shield, Home, BookOpen, CheckCircle, XCircle, PauseCircle } from 'lucide-react';
+import { addDays, isAfter, differenceInDays } from 'date-fns';
 
 export const AdminAccounts = () => {
   const { state, t } = useApp();
@@ -56,10 +55,27 @@ export const AdminAccounts = () => {
                         const unitsCount = state.units.filter(u => u.user_id === user.id).length;
                         const bookingsCount = state.bookings.filter(b => b.user_id === user.id).length;
                         
-                        let isSubscribed = false;
+                        let subStatus = 'Not Subscribed';
+                        let BadgeIcon = XCircle;
+                        let badgeColor = 'bg-gray-100 text-gray-500 border-gray-200';
+
                         if (user.subscription) {
-                             const end = addDays(parseISO(user.subscription.start_date), user.subscription.duration_days);
-                             isSubscribed = isAfter(end, new Date());
+                             const end = addDays(new Date(user.subscription.start_date), user.subscription.duration_days);
+                             const daysLeft = differenceInDays(end, new Date());
+                             
+                             if (user.subscription.status === 'paused') {
+                                 subStatus = 'Paused';
+                                 BadgeIcon = PauseCircle;
+                                 badgeColor = 'bg-amber-100 text-amber-700 border-amber-200';
+                             } else if (daysLeft > 0) {
+                                 subStatus = 'Active';
+                                 BadgeIcon = CheckCircle;
+                                 badgeColor = 'bg-green-100 text-green-700 border-green-200';
+                             } else {
+                                 subStatus = 'Expired';
+                                 BadgeIcon = XCircle;
+                                 badgeColor = 'bg-red-100 text-red-700 border-red-200';
+                             }
                         }
 
                         return (
@@ -95,15 +111,9 @@ export const AdminAccounts = () => {
                                 </div>
                             </td>
                             <td className="p-5 text-center">
-                                {isSubscribed ? (
-                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700 border border-green-200">
-                                        <CheckCircle size={14} /> {t('active')}
-                                    </span>
-                                ) : (
-                                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700 border border-red-200">
-                                        <XCircle size={14} /> {user.subscription ? t('expired') : 'Not Subscribed'}
-                                    </span>
-                                )}
+                                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${badgeColor}`}>
+                                    <BadgeIcon size={14} /> {subStatus === 'Active' ? t('active') : subStatus === 'Paused' ? t('paused') : subStatus === 'Expired' ? t('expired') : 'No Sub'}
+                                </span>
                             </td>
                         </tr>
                     )})}

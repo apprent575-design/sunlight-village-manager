@@ -25,33 +25,17 @@
                 200: '#bfdbfe',
                 300: '#93c5fd',
                 400: '#60a5fa',
-                500: '#3b82f6', 
-                600: '#2563eb',
+                500: '#3b82f6',
+                600: '#2563eb', // Matches the blue in screenshot
                 700: '#1d4ed8',
                 800: '#1e40af',
                 900: '#1e3a8a',
                 950: '#172554',
-              },
-              brand: {
-                 light: '#0ea5e9', // Sky 500
-                 DEFAULT: '#0284c7', // Sky 600
-                 dark: '#0369a1', // Sky 700
-                 accent: '#6366f1' // Indigo 500
               }
             },
             boxShadow: {
-                'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
-                'glow': '0 0 15px rgba(14, 165, 233, 0.3)',
-                'card': '0 4px 6px -1px rgba(0, 0, 0, 0.02), 0 2px 4px -1px rgba(0, 0, 0, 0.02)'
-            },
-            animation: {
-                'float': 'float 6s ease-in-out infinite',
-            },
-            keyframes: {
-                float: {
-                    '0%, 100%': { transform: 'translateY(0)' },
-                    '50%': { transform: 'translateY(-10px)' },
-                }
+                'card': '0 2px 5px rgba(0, 0, 0, 0.05)',
+                'soft': '0 4px 20px -2px rgba(0, 0, 0, 0.05)'
             }
           },
         },
@@ -59,137 +43,104 @@
     </script>
     <style>
       body {
-        background-color: #f8fafc;
-        background-image: 
-          radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.08) 0px, transparent 50%),
-          radial-gradient(at 100% 0%, rgba(14, 165, 233, 0.08) 0px, transparent 50%),
-          radial-gradient(at 100% 100%, rgba(99, 102, 241, 0.05) 0px, transparent 50%);
-        background-attachment: fixed;
+        background-color: #f1f5f9; /* Slate 100/200 mix */
       }
       
       .dark body {
         background-color: #0f172a;
-        background-image: 
-          radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.1) 0px, transparent 50%),
-          radial-gradient(at 100% 0%, rgba(14, 165, 233, 0.1) 0px, transparent 50%);
       }
 
-      /* Glassmorphism Utility */
+      /* Clean White Card Style (Replaces Glass) */
       .glass {
-        background: rgba(255, 255, 255, 0.7);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.5);
+        background: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.03);
+        border: 1px solid #f1f5f9;
       }
       
       .dark .glass {
-        background: rgba(30, 41, 59, 0.7);
-        border: 1px solid rgba(255, 255, 255, 0.05);
+        background: #1e293b;
+        border-color: #334155;
+        box-shadow: none;
       }
 
-      /* --- MODERN CALENDAR STYLING --- */
+      /* Calendar Styling */
       .rbc-calendar { font-family: 'Cairo', sans-serif; }
       
       /* Month View Container */
       .rbc-month-view {
-        border-radius: 20px;
+        border-radius: 16px;
         overflow: hidden;
-        border: none !important; /* Remove default ugly border */
-        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
         background: white;
+        border: 1px solid #e2e8f0 !important;
       }
       .dark .rbc-month-view {
-        background: rgba(30, 41, 59, 0.4);
+        background: #1e293b; /* Match card background */
+        border-color: #334155 !important;
       }
 
       /* Header (Days of week) */
       .rbc-header {
-        padding: 12px 0;
-        font-weight: 700;
-        font-size: 13px;
-        letter-spacing: 0.5px;
-        text-transform: uppercase;
-        color: #64748b; /* Slate 500 */
-        background: #f8fafc; /* Slate 50 */
+        padding: 16px 0;
+        font-weight: 800;
+        color: #475569;
+        background: #f8fafc;
         border-bottom: 1px solid #e2e8f0 !important;
-        border-left: none !important;
+        text-transform: uppercase;
+        font-size: 0.85rem;
       }
       .dark .rbc-header {
         color: #94a3b8;
-        background: rgba(30, 41, 59, 0.8);
-        border-bottom-color: rgba(255,255,255,0.05) !important;
+        background: #1e293b;
+        border-bottom-color: #334155 !important;
       }
 
-      /* Date Cells */
-      .rbc-day-bg {
-        border-left: 1px solid #f1f5f9 !important; /* Lighter borders */
-      }
-      .dark .rbc-day-bg {
-        border-left: 1px solid rgba(255,255,255,0.05) !important;
-      }
-      
-      /* Row Borders */
-      .rbc-month-row {
-        border-bottom: 1px solid #f1f5f9 !important;
-      }
-      .dark .rbc-month-row {
-        border-bottom: 1px solid rgba(255,255,255,0.05) !important;
-      }
+      /* Grid Lines - Increased contrast for dark mode */
+      .rbc-day-bg { border-left: 1px solid #e2e8f0 !important; }
+      .dark .rbc-day-bg { border-left: 1px solid #475569 !important; } /* Lighter border for visibility */
+      .rbc-month-row { border-bottom: 1px solid #e2e8f0 !important; }
+      .dark .rbc-month-row { border-bottom: 1px solid #475569 !important; }
 
-      /* "Today" Highlight */
-      .rbc-today {
-        background-color: rgba(14, 165, 233, 0.08) !important; /* Soft Sky Blue */
-      }
-      .dark .rbc-today {
-        background-color: rgba(14, 165, 233, 0.15) !important;
-      }
-
-      /* Off-Range Dates */
+      /* Off-Range (Dates from prev/next month) */
       .rbc-off-range-bg {
-        background-color: #fcfcfc !important;
+        background-color: #f8fafc !important; 
       }
       .dark .rbc-off-range-bg {
-        background-color: rgba(15, 23, 42, 0.6) !important;
+        background-color: transparent !important; 
+      }
+      .dark .rbc-off-range .rbc-button-link {
+        color: #64748b; /* Solid slate-500, removed opacity to fix 'faded' look */
+        font-weight: 500;
       }
 
-      /* Date Number Styling */
+      /* Date Numbers */
       .rbc-date-cell {
-        padding: 8px !important;
-        font-size: 12px;
-        font-weight: 600;
-        color: #475569;
+        padding: 8px;
+        font-weight: 700;
+        font-size: 0.9rem;
       }
-      .dark .rbc-date-cell {
-        color: #cbd5e1;
-      }
-      .rbc-now .rbc-button-link {
-        color: #0ea5e9; /* Brand Color for today's number */
-        font-weight: 800;
+      .dark .rbc-date-cell .rbc-button-link {
+        color: #e2e8f0; /* Bright text for current month */
       }
 
-      /* Event Styling */
+      /* Today Cell */
+      .rbc-today { 
+        background-color: #eff6ff !important; 
+      }
+      .dark .rbc-today { 
+        background-color: rgba(59, 130, 246, 0.25) !important; /* Slightly more visible background */
+        border: 1px solid rgba(59, 130, 246, 0.5);
+      }
+
+      /* Event Bars */
       .rbc-event {
-        border-radius: 6px !important;
-        padding: 2px 4px !important;
-        font-size: 11px !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        border: none !important;
-        margin-bottom: 2px !important;
+        border-radius: 6px;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
       }
       
-      /* Hide default focus outline */
-      .rbc-event:focus {
-        outline: none;
-      }
-
-      /* Hide Scrollbar but allow scrolling */
-      .no-scrollbar::-webkit-scrollbar {
-        display: none;
-      }
-      .no-scrollbar {
-        -ms-overflow-style: none;  /* IE and Edge */
-        scrollbar-width: none;  /* Firefox */
-      }
+      /* Hide Scrollbar util */
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
   <script type="importmap">
 {
@@ -213,7 +164,7 @@
 </script>
 <link rel="stylesheet" href="/index.css">
 </head>
-  <body class="text-gray-900 dark:text-gray-100 transition-colors duration-200 antialiased selection:bg-primary-500 selection:text-white">
+  <body class="text-gray-800 dark:text-gray-100 transition-colors duration-200 antialiased bg-slate-100 dark:bg-slate-900">
     <div id="root"></div>
   <script type="module" src="/index.tsx"></script>
 </body>

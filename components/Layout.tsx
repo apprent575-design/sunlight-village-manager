@@ -17,7 +17,8 @@ import {
   Moon,
   Users,
   CreditCard,
-  FileText
+  FileText,
+  HelpCircle
 } from 'lucide-react';
 
 export const Layout = ({ children }: { children?: React.ReactNode }) => {
@@ -33,6 +34,7 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
     { path: '/calendar', icon: Calendar, label: t('calendar') },
     { path: '/expenses', icon: DollarSign, label: t('expenses') },
     { path: '/reports', icon: PieChart, label: t('reports') },
+    { path: '/features', icon: HelpCircle, label: t('featuresGuide') },
     { path: '/settings', icon: Settings, label: t('settings') },
   ];
 
@@ -68,7 +70,7 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
       `}>
         <div className="p-8 flex items-center justify-between">
           <div className="flex flex-col">
-              <h1 className="text-3xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-brand-accent tracking-tight">
+              <h1 className="text-3xl font-extrabold text-blue-600 dark:text-white tracking-tight drop-shadow-sm">
                 Sunlight
               </h1>
               <span className="text-xs font-bold text-gray-400 tracking-widest uppercase ml-0.5">
@@ -153,7 +155,7 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
           <button onClick={toggleSidebar} className="text-gray-600 dark:text-gray-300 p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-800">
             <Menu size={24} />
           </button>
-          <span className="font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-brand-accent">Sunlight</span>
+          <span className="font-extrabold text-blue-600 dark:text-white">Sunlight</span>
           <div className="w-10" /> 
         </header>
 

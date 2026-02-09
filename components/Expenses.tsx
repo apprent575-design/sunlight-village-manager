@@ -2,12 +2,28 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import { Expense } from '../types';
-import { Plus, Download, Calendar, Edit2, Trash2, Check, X, AlertTriangle, Loader2 } from 'lucide-react';
-import { format, isWithinInterval, isValid, startOfMonth, endOfMonth } from 'date-fns';
+import { Plus, Download, Calendar, Edit2, Trash2, Check, X, AlertTriangle, Loader2, ChevronsRight } from 'lucide-react';
+import { format, isWithinInterval, isValid } from 'date-fns';
 import { generateExpenseReport } from '../utils/pdfGenerator';
 
+// Manual startOfMonth helpers
+const startOfMonth = (date: Date) => {
+    const d = new Date(date);
+    d.setDate(1);
+    d.setHours(0,0,0,0);
+    return d;
+}
+
+const endOfMonth = (date: Date) => {
+    const d = new Date(date);
+    d.setMonth(d.getMonth() + 1);
+    d.setDate(0);
+    d.setHours(23, 59, 59, 999);
+    return d;
+}
+
 export const Expenses = () => {
-  const { t, state, addExpense, updateExpense, deleteExpense, language, isRTL } = useApp();
+  const { t, state, addExpense, updateExpense, deleteExpense, language, isRTL, formatDate } = useApp();
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -56,6 +72,21 @@ export const Expenses = () => {
     }
     return matchesUnit && matchesDate;
   });
+
+  const handleAllTime = () => {
+    const dates: number[] = [];
+    state.expenses.forEach(e => {
+        if(e.date) dates.push(new Date(e.date).getTime());
+    });
+    // Fallback if no expenses exist
+    if (dates.length === 0) dates.push(new Date().getTime());
+    else dates.push(new Date().getTime()); // ensure today is included for "current" view
+
+    const minDate = Math.min(...dates);
+    const maxDate = Math.max(...dates);
+    setFilterStart(format(new Date(minDate), 'yyyy-MM-dd'));
+    setFilterEnd(format(new Date(maxDate), 'yyyy-MM-dd'));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -130,48 +161,69 @@ export const Expenses = () => {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h2 className="text-3xl font-bold text-gray-800 dark:text-white">{t('expenses')}</h2>
         
-        <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
-            <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-2 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-                <Calendar size={18} className="text-gray-500" />
-                <input 
-                    type="date" 
-                    className="bg-transparent outline-none text-sm dark:text-gray-300 w-28" 
-                    value={filterStart}
-                    onChange={(e) => setFilterStart(e.target.value)}
-                />
-                <span className="text-gray-400 font-bold">{isRTL ? '←' : '→'}</span>
-                <input 
-                    type="date" 
-                    className="bg-transparent outline-none text-sm dark:text-gray-300 w-28" 
-                    value={filterEnd}
-                    onChange={(e) => setFilterEnd(e.target.value)}
-                />
+        <div className="flex flex-col md:flex-row gap-4 items-end md:items-center w-full md:w-auto">
+            <div className="flex flex-col items-center">
+                <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-2 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-x-auto max-w-[90vw] md:max-w-full no-scrollbar">
+                    
+                    <select 
+                        className="bg-transparent text-sm font-bold text-gray-600 dark:text-gray-300 outline-none px-2 max-w-[120px]"
+                        value={filterUnit}
+                        onChange={(e) => setFilterUnit(e.target.value)}
+                    >
+                        <option value="all">{t('allUnits')}</option>
+                        {state.units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    </select>
+
+                    <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-1 shrink-0"></div>
+
+                    {/* Calendar Icon - Black as requested */}
+                    <Calendar size={18} className="text-black dark:text-white shrink-0" />
+
+                    <input 
+                        type="date" 
+                        className="bg-transparent outline-none text-sm dark:text-gray-300 w-28 md:w-32" 
+                        value={filterStart}
+                        onChange={(e) => setFilterStart(e.target.value)}
+                    />
+                    <span className="text-gray-400 font-bold shrink-0">{isRTL ? '←' : '→'}</span>
+                    <input 
+                        type="date" 
+                        className="bg-transparent outline-none text-sm dark:text-gray-300 w-28 md:w-32" 
+                        value={filterEnd}
+                        onChange={(e) => setFilterEnd(e.target.value)}
+                    />
+                    
+                    <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-1 shrink-0"></div>
+
+                    <button 
+                        onClick={handleAllTime}
+                        className="px-2 py-1 text-xs font-bold bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-600 dark:text-gray-300 rounded transition-colors whitespace-nowrap shrink-0"
+                    >
+                        {t('allTime')}
+                    </button>
+                </div>
+                <div className="md:hidden mt-1 text-[10px] text-gray-400 font-medium flex items-center gap-1 animate-pulse">
+                    <span>{t('swipeForMore')}</span> <ChevronsRight size={10} className={isRTL ? 'rotate-180' : ''}/>
+                </div>
             </div>
-
-           <select 
-            className="p-2 rounded-xl border bg-white/50 dark:bg-slate-800 border-gray-200 dark:border-gray-700 outline-none"
-            value={filterUnit}
-            onChange={(e) => setFilterUnit(e.target.value)}
-           >
-             <option value="all">{t('allUnits')}</option>
-             {state.units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-           </select>
            
-           <button 
-             onClick={() => generateExpenseReport(state.expenses, state.units, language, t, filterStart, filterEnd, filterUnit)}
-             className="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-xl flex items-center justify-center gap-2 shadow-lg"
-           >
-             <Download size={18} />
-             PDF
-           </button>
+           <div className="flex gap-2">
+                <button 
+                    onClick={() => generateExpenseReport(state.expenses, state.units, language, t, filterStart, filterEnd, filterUnit)}
+                    className="bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-xl flex items-center justify-center gap-2 shadow-lg"
+                >
+                    <Download size={18} />
+                    PDF
+                </button>
 
-           <button 
-            onClick={() => { closeForm(); setShowAdd(true); }}
-            className="bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-primary-500/30"
-           >
-             <Plus size={18} />
-             {t('addExpense')}
-           </button>
+                <button 
+                    onClick={() => { closeForm(); setShowAdd(true); }}
+                    className="bg-primary-500 hover:bg-primary-600 text-white px-4 py-2 rounded-xl flex items-center justify-center gap-2 shadow-lg shadow-primary-500/30"
+                >
+                    <Plus size={18} />
+                    {t('addExpense')}
+                </button>
+           </div>
         </div>
       </div>
 
@@ -251,7 +303,7 @@ export const Expenses = () => {
               const d = new Date(expense.date);
               return (
               <tr key={expense.id} className="hover:bg-gray-50/50 dark:hover:bg-slate-800/50 group">
-                <td className="p-4">{isValid(d) ? format(d, 'MMM dd, yyyy') : 'Invalid Date'}</td>
+                <td className="p-4">{isValid(d) ? formatDate(d) : 'Invalid Date'}</td>
                 <td className="p-4">{state.units.find(u => u.id === expense.unit_id)?.name}</td>
                 <td className="p-4 font-medium">{expense.title}</td>
                 <td className="p-4 text-sm text-gray-500">

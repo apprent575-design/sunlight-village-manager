@@ -10,6 +10,7 @@ export const TRANSLATIONS = {
     reports: 'Reports',
     units: 'Units',
     settings: 'Settings',
+    featuresGuide: 'Features & Guide',
     logout: 'Logout',
     totalActiveBookings: 'Active Bookings',
     netProfit: 'Net Profit',
@@ -97,6 +98,8 @@ export const TRANSLATIONS = {
     totalDays: 'Total Days',
     reportPeriod: 'Report Period',
     generateReport: 'Generate Report',
+    allTime: 'All Time',
+    swipeForMore: 'Swipe for more',
     // Expenses Categories
     maintenance: 'Maintenance',
     electricity: 'Electricity',
@@ -153,6 +156,7 @@ export const TRANSLATIONS = {
     reports: 'التقارير',
     units: 'الوحدات',
     settings: 'الإعدادات',
+    featuresGuide: 'المميزات والشرح',
     logout: 'تسجيل خروج',
     totalActiveBookings: 'الحجوزات النشطة',
     netProfit: 'صافي الربح',
@@ -240,6 +244,8 @@ export const TRANSLATIONS = {
     totalDays: 'إجمالي الأيام',
     reportPeriod: 'فترة التقرير',
     generateReport: 'استخراج التقرير',
+    allTime: 'كل المدة',
+    swipeForMore: 'اسحب للمزيد',
     // Expenses Categories
     maintenance: 'صيانة',
     electricity: 'كهرباء',

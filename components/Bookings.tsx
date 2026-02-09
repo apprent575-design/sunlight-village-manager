@@ -2,12 +2,27 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { Booking, BookingStatus, PaymentStatus } from '../types';
-import { Plus, Edit2, Trash2, FileText, CheckCircle, Clock, XCircle, MessageCircle, Calendar, ThumbsUp, ThumbsDown, AlertTriangle, Loader2 } from 'lucide-react';
-import { format, addDays, parseISO, isWithinInterval, isValid } from 'date-fns';
+import { Plus, Edit2, Trash2, FileText, CheckCircle, Clock, XCircle, MessageCircle, Calendar, ThumbsUp, ThumbsDown, AlertTriangle, Loader2, Home, ChevronsRight, Phone } from 'lucide-react';
+import { format, addDays, isWithinInterval, isValid } from 'date-fns';
 import { generateReceipt } from '../utils/pdfGenerator';
 
+const startOfMonth = (date: Date) => {
+  const d = new Date(date);
+  d.setDate(1);
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+const endOfMonth = (date: Date) => {
+  const d = new Date(date);
+  d.setMonth(d.getMonth() + 1);
+  d.setDate(0);
+  d.setHours(23, 59, 59, 999);
+  return d;
+};
+
 export const Bookings = () => {
-  const { t, state, addBooking, updateBooking, deleteBooking, language, isRTL } = useApp();
+  const { t, state, addBooking, updateBooking, deleteBooking, language, isRTL, formatDate } = useApp();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [bookingToDelete, setBookingToDelete] = useState<Booking | null>(null);
@@ -17,8 +32,9 @@ export const Bookings = () => {
   const [formError, setFormError] = useState<string | null>(null);
 
   // Filters
-  const [filterStart, setFilterStart] = useState('');
-  const [filterEnd, setFilterEnd] = useState('');
+  const [filterStart, setFilterStart] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
+  const [filterEnd, setFilterEnd] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
+  const [filterUnit, setFilterUnit] = useState<string>('all'); // New Unit Filter
 
   // Form State
   const [formData, setFormData] = useState<Partial<Booking>>({
@@ -39,10 +55,36 @@ export const Bookings = () => {
     tenant_rating_good: true, // Default to 'Welcome Again'
   });
 
+  // Helper for yyyy-MM-dd parsing to local midnight
+  const parseDate = (str: string) => {
+    const parts = str.split('-');
+    if (parts.length === 3) {
+        return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    }
+    return new Date(str);
+  };
+
+  const handleAllTime = () => {
+    const dates: number[] = [];
+    state.bookings.forEach(b => {
+        if(b.start_date) dates.push(new Date(b.start_date).getTime());
+        if(b.end_date) dates.push(new Date(b.end_date).getTime());
+    });
+    // Fallback if no bookings exist
+    if (dates.length === 0) dates.push(new Date().getTime());
+    else dates.push(new Date().getTime()); // ensure today is covered
+
+    const minDate = Math.min(...dates);
+    const maxDate = Math.max(...dates);
+    setFilterStart(format(new Date(minDate), 'yyyy-MM-dd'));
+    setFilterEnd(format(new Date(maxDate), 'yyyy-MM-dd'));
+  };
+
   // Auto Calculations
   useEffect(() => {
     if (formData.start_date && formData.nights) {
-      const parsedDate = parseISO(formData.start_date);
+      // Use parseDate helper to avoid timezone issues with yyyy-MM-dd
+      const parsedDate = parseDate(formData.start_date);
       
       // Prevent invalid date operations
       if (!isValid(parsedDate)) return;
@@ -167,6 +209,10 @@ export const Bookings = () => {
 
   // Filter Bookings
   const filteredBookings = state.bookings.filter(b => {
+    // 1. Unit Filter
+    if (filterUnit !== 'all' && b.unit_id !== filterUnit) return false;
+
+    // 2. Date Filter
     if (!filterStart || !filterEnd) return true;
     const bookingDate = new Date(b.start_date);
     if (!isValid(bookingDate)) return false;
@@ -176,33 +222,58 @@ export const Bookings = () => {
     return isWithinInterval(bookingDate, { start, end });
   });
 
-  const formatDateSafe = (dateStr: string) => {
-      const d = new Date(dateStr);
-      // Format: MMM dd yyyy (e.g., Feb 06 2024)
-      return isValid(d) ? format(d, 'MMM dd yyyy') : 'Invalid Date';
-  };
-
   return (
     <div className="space-y-6 relative">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h2 className="text-3xl font-bold text-gray-800 dark:text-white">{t('bookings')}</h2>
         <div className="flex flex-col md:flex-row gap-4 items-end md:items-center w-full md:w-auto">
-            {/* Date Filters */}
-            <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-2 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm">
-                <Calendar size={18} className="text-gray-500" />
-                <input 
-                    type="date" 
-                    className="bg-transparent outline-none text-sm dark:text-gray-300 w-32" 
-                    value={filterStart}
-                    onChange={(e) => setFilterStart(e.target.value)}
-                />
-                <span className="text-gray-400 font-bold">{isRTL ? '←' : '→'}</span>
-                <input 
-                    type="date" 
-                    className="bg-transparent outline-none text-sm dark:text-gray-300 w-32" 
-                    value={filterEnd}
-                    onChange={(e) => setFilterEnd(e.target.value)}
-                />
+            {/* Filters Container */}
+            <div className="flex flex-col items-center">
+                <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-2 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-x-auto max-w-[90vw] md:max-w-full no-scrollbar">
+                    {/* Unit Filter */}
+                    <select
+                        className="bg-transparent text-sm font-bold text-gray-600 dark:text-gray-300 outline-none px-2 max-w-[120px]"
+                        value={filterUnit}
+                        onChange={(e) => setFilterUnit(e.target.value)}
+                    >
+                        <option value="all">{t('allUnits')}</option>
+                        {state.units.map(u => (
+                            <option key={u.id} value={u.id}>{u.name}</option>
+                        ))}
+                    </select>
+                    
+                    <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-1 shrink-0"></div>
+
+                    {/* Calendar Icon - Black as requested */}
+                    <Calendar size={18} className="text-black dark:text-white shrink-0" />
+
+                    {/* Date Filters */}
+                    <input 
+                        type="date" 
+                        className="bg-transparent outline-none text-sm dark:text-gray-300 w-28 md:w-32" 
+                        value={filterStart}
+                        onChange={(e) => setFilterStart(e.target.value)}
+                    />
+                    <span className="text-gray-400 font-bold shrink-0">{isRTL ? '←' : '→'}</span>
+                    <input 
+                        type="date" 
+                        className="bg-transparent outline-none text-sm dark:text-gray-300 w-28 md:w-32" 
+                        value={filterEnd}
+                        onChange={(e) => setFilterEnd(e.target.value)}
+                    />
+                    
+                    <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 mx-1 shrink-0"></div>
+
+                    <button 
+                        onClick={handleAllTime}
+                        className="px-2 py-1 text-xs font-bold bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 text-gray-600 dark:text-gray-300 rounded transition-colors whitespace-nowrap shrink-0"
+                    >
+                        {t('allTime')}
+                    </button>
+                </div>
+                <div className="md:hidden mt-1 text-[10px] text-gray-400 font-medium flex items-center gap-1 animate-pulse">
+                    <span>{t('swipeForMore')}</span> <ChevronsRight size={10} className={isRTL ? 'rotate-180' : ''}/>
+                </div>
             </div>
 
             <button 
@@ -244,7 +315,7 @@ export const Bookings = () => {
                  <div>
                     <span className="block text-gray-400 text-xs mb-1">{t('dates')}</span>
                     <span className="font-medium dark:text-gray-200">
-                        {formatDateSafe(booking.start_date)} - {formatDateSafe(booking.end_date)}
+                        {formatDate(booking.start_date)} - {formatDate(booking.end_date)}
                     </span>
                  </div>
                  <div>
@@ -271,6 +342,13 @@ export const Bookings = () => {
               {/* CARD FOOTER - Wrapped to prevent overflow */}
               <div className="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 dark:border-gray-700 pt-4">
                  <div className="flex items-center gap-2">
+                     <a 
+                        href={`tel:+20${booking.phone}`} 
+                        className="flex items-center justify-center gap-2 text-blue-600 hover:text-blue-700 font-bold bg-blue-50 hover:bg-blue-100 p-2 rounded-lg transition-colors"
+                        title="Call"
+                     >
+                        <Phone size={18} />
+                     </a>
                      <a 
                         href={`https://wa.me/20${booking.phone}`} 
                         target="_blank" 

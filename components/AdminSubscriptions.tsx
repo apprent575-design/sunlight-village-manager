@@ -1,322 +1,357 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { User, Subscription } from '../types';
-import { addDays, format, differenceInDays, parseISO, isAfter, isValid } from 'date-fns';
-import { Users, Search, Plus, Calendar, DollarSign, Download, Trash2, Edit2, CheckCircle, XCircle, AlertTriangle, Loader2, PauseCircle, PlayCircle } from 'lucide-react';
+import { Subscription, User } from '../types';
+import { addDays, format, differenceInDays, isValid } from 'date-fns';
+import { Search, Calendar, Trash2, Edit2, Download, PauseCircle, PlayCircle, Loader2, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
 import { generateSubscriptionReceipt } from '../utils/pdfGenerator';
 
 export const AdminSubscriptions = () => {
-  const { state, t, addSubscription, updateSubscription, deleteSubscription, isRTL, language } = useApp();
+  const { state, t, addSubscription, updateSubscription, deleteSubscription, language } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
+  
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [editingSubId, setEditingSubId] = useState<string | null>(null);
   
-  const [subToDelete, setSubToDelete] = useState<Subscription | null>(null);
+  // Delete Modal State
+  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  
+
+  const [isLoading, setIsLoading] = useState(false);
+
   // Form State
-  const [duration, setDuration] = useState(30);
-  const [price, setPrice] = useState(0);
-  const [startDate, setStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-
-  // Calculate end date for display
-  const endDateDisplay = isValid(parseISO(startDate)) && duration 
-    ? format(addDays(parseISO(startDate), duration), 'yyyy-MM-dd') 
-    : '-';
-
-  const openModal = (user: User, existingSub?: Subscription) => {
-      setSelectedUser(user);
-      if (existingSub) {
-          setEditingSubId(existingSub.id);
-          setDuration(existingSub.duration_days);
-          setPrice(existingSub.price);
-          setStartDate(existingSub.start_date);
-      } else {
-          setEditingSubId(null);
-          setDuration(30);
-          setPrice(0);
-          setStartDate(format(new Date(), 'yyyy-MM-dd'));
-      }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedUser) return;
-
-    // Logic: If we are adding/renewing, we almost certainly want it to be 'active'
-    const subPayload: Subscription = {
-        id: editingSubId || crypto.randomUUID(),
-        user_id: selectedUser.id,
-        start_date: startDate,
-        duration_days: duration,
-        price: price,
-        status: 'active' // Auto-activate on save
-    };
-
-    try {
-        if (editingSubId) {
-            await updateSubscription(subPayload);
-        } else {
-            await addSubscription(subPayload);
-        }
-        setSelectedUser(null);
-        setEditingSubId(null);
-    } catch (error) {
-        alert("Failed to save subscription! Make sure your account is an Admin in the database.\n\nError: " + (error as any).message);
-    }
-  };
-
-  const confirmDelete = async () => {
-      if(subToDelete) {
-          setIsDeleting(true);
-          try {
-              await deleteSubscription(subToDelete.id);
-          } catch (error) {
-              alert("Failed to delete. Error: " + (error as any).message);
-          } finally {
-              setIsDeleting(false);
-              setSubToDelete(null);
-          }
-      }
-  };
-
-  const togglePause = async (sub: Subscription) => {
-      const newStatus = sub.status === 'paused' ? 'active' : 'paused';
-      try {
-          await updateSubscription({ ...sub, status: newStatus });
-      } catch (error) {
-          alert("Failed to update status.");
-      }
-  };
+  const [formData, setFormData] = useState({
+      id: '',
+      startDate: format(new Date(), 'yyyy-MM-dd'),
+      duration: 30,
+      price: 0,
+      status: 'active' as 'active' | 'paused' | 'expired'
+  });
 
   const filteredUsers = state.allUsers.filter(u => 
     u.role !== 'admin' && 
-    (u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.includes(searchTerm.toLowerCase()))
+    (u.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) || u.email.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  // Open Modal for Renew/Edit
+  const openEditModal = (user: User) => {
+      setSelectedUser(user);
+      const sub = user.subscription;
+      if (sub) {
+          setFormData({
+              id: sub.id,
+              startDate: sub.start_date,
+              duration: sub.duration_days,
+              price: sub.price,
+              status: sub.status as any
+          });
+      } else {
+          setFormData({
+              id: crypto.randomUUID(),
+              startDate: format(new Date(), 'yyyy-MM-dd'),
+              duration: 30,
+              price: 0,
+              status: 'active'
+          });
+      }
+      setIsModalOpen(true);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!selectedUser) return;
+      setIsLoading(true);
+
+      try {
+          const payload: Subscription = {
+              id: formData.id,
+              user_id: selectedUser.id,
+              start_date: formData.startDate,
+              duration_days: Number(formData.duration),
+              price: Number(formData.price),
+              status: formData.status
+          };
+          
+          // Determine if update or add based on if user already had sub
+          if (selectedUser.subscription) {
+             await updateSubscription(payload);
+          } else {
+             await addSubscription(payload);
+          }
+          setIsModalOpen(false);
+      } catch (err) {
+          alert('Error saving subscription');
+      } finally {
+          setIsLoading(false);
+      }
+  };
+
+  const togglePause = async (user: User) => {
+      if (!user.subscription) return;
+      const newStatus = user.subscription.status === 'paused' ? 'active' : 'paused';
+      await updateSubscription({ ...user.subscription, status: newStatus });
+  };
+
+  const handleDeleteClick = (subId: string) => {
+      setDeleteId(subId);
+  };
+
+  const confirmDelete = async () => {
+      if (!deleteId) return;
+      setIsDeleting(true);
+      try {
+          await deleteSubscription(deleteId);
+          setDeleteId(null);
+      } catch (error) {
+          alert('Failed to delete subscription');
+      } finally {
+          setIsDeleting(false);
+      }
+  };
+
+  // Calculate End Date for Modal display
+  const getEndDate = () => {
+      if (!formData.startDate) return '-';
+      try {
+          const start = new Date(formData.startDate);
+          if (!isValid(start)) return '-';
+          return format(addDays(start, Number(formData.duration)), 'yyyy-MM-dd');
+      } catch { return '-'; }
+  };
+
   return (
-    <div className="space-y-8">
-       <div className="flex justify-between items-center">
-         <h2 className="text-3xl font-bold text-gray-800 dark:text-white">{t('subscriptions')}</h2>
-       </div>
+    <div className="space-y-6 pb-10">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+            <div>
+               <h2 className="text-3xl font-bold text-gray-800 dark:text-white">{t('subscriptions')}</h2>
+            </div>
+            <div className="relative w-full md:w-72">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                <input 
+                    type="text" 
+                    placeholder={language === 'ar' ? 'بحث عن مستخدم...' : "Search users..."}
+                    className="w-full pl-10 p-3 rounded-xl bg-white dark:bg-slate-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white placeholder-gray-400 focus:ring-2 ring-primary-500 outline-none transition-colors"
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                />
+            </div>
+        </div>
 
-       {/* Search */}
-       <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-          <input 
-             type="text" 
-             placeholder="Search users..." 
-             className="w-full pl-10 p-4 rounded-2xl bg-white dark:bg-slate-800 border border-gray-100 dark:border-gray-700 outline-none focus:ring-2 ring-primary-500"
-             value={searchTerm}
-             onChange={e => setSearchTerm(e.target.value)}
-          />
-       </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {filteredUsers.map(user => {
+                const sub = user.subscription;
+                let status = 'Not Subscribed';
+                let daysLeft = 0;
+                let progress = 0;
+                let endDateStr = '-';
+                let statusColor = 'bg-gray-100 text-gray-600 dark:bg-slate-700 dark:text-gray-300';
+                
+                if (sub) {
+                    const start = new Date(sub.start_date);
+                    const end = addDays(start, sub.duration_days);
+                    endDateStr = format(end, 'yyyy-MM-dd');
+                    daysLeft = differenceInDays(end, new Date());
+                    if (daysLeft < 0) daysLeft = 0;
+                    
+                    const totalDays = sub.duration_days;
+                    progress = totalDays > 0 ? (daysLeft / totalDays) * 100 : 0;
+                    
+                    if (sub.status === 'paused') {
+                        status = 'Paused';
+                        statusColor = 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 border border-amber-200 dark:border-amber-800';
+                    } else if (daysLeft > 0) {
+                        status = 'Active';
+                        statusColor = 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800';
+                    } else {
+                        status = 'Expired';
+                        statusColor = 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-800';
+                    }
+                }
 
-       {/* User Cards */}
-       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredUsers.map(user => {
-              const sub = user.subscription;
-              let daysLeft = 0;
-              let isExpired = true;
-              let isPaused = sub?.status === 'paused';
-
-              if (sub) {
-                  const end = addDays(parseISO(sub.start_date), sub.duration_days);
-                  daysLeft = differenceInDays(end, new Date());
-                  // Explicit status check overrides date calc for UI badge
-                  isExpired = daysLeft <= 0;
-              }
-
-              return (
-                <div key={user.id} className="glass p-6 rounded-3xl relative overflow-hidden group">
-                    <div className="flex justify-between items-start mb-4">
-                        <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold text-lg">
-                                {user.full_name?.charAt(0)}
-                            </div>
-                            <div>
-                                <h3 className="font-bold text-gray-800 dark:text-white">{user.full_name}</h3>
-                                <p className="text-xs text-gray-500">{user.email}</p>
+                return (
+                    <div key={user.id} className="bg-white dark:bg-slate-800 rounded-[24px] p-6 relative border border-gray-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-all flex flex-col justify-between min-h-[280px] group">
+                        
+                        {/* Header */}
+                        <div className="flex justify-between items-start mb-6">
+                            <span className={`px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 ${statusColor}`}>
+                                {sub?.status === 'paused' ? <PauseCircle size={14}/> : daysLeft > 0 && sub ? <CheckCircle size={14}/> : <XCircle size={14}/>}
+                                {language === 'ar' ? (status === 'Active' ? 'نشط' : status === 'Paused' ? 'موقوف' : status === 'Expired' ? 'منتهي' : 'غير مشترك') : status}
+                            </span>
+                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-xl shadow-lg shadow-blue-500/20">
+                                {user.full_name?.charAt(0).toUpperCase()}
                             </div>
                         </div>
-                        {sub && (
-                            <div className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                isPaused 
-                                    ? 'bg-amber-100 text-amber-700' 
-                                    : !isExpired 
-                                        ? 'bg-green-100 text-green-700' 
-                                        : 'bg-red-100 text-red-700'
-                            }`}>
-                                {isPaused ? t('paused') : !isExpired ? t('active') : t('expired')}
-                            </div>
-                        )}
-                    </div>
 
-                    {sub ? (
-                        <div className={`space-y-3 mb-6 p-4 rounded-2xl ${isPaused ? 'bg-amber-50 dark:bg-amber-900/10' : 'bg-gray-50 dark:bg-slate-800/50'}`}>
-                            <div className="flex justify-between text-sm">
-                                <span className="text-gray-500">{t('daysRemaining')}</span>
-                                <span className={`font-bold ${daysLeft < 5 ? 'text-red-500' : 'text-gray-800 dark:text-white'}`}>
-                                    {daysLeft > 0 ? daysLeft : 0} {t('days')}
-                                </span>
+                        {/* User Info */}
+                        <div className="text-right mb-6">
+                            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-1 group-hover:text-primary-600 transition-colors">{user.full_name}</h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 font-medium">{user.email}</p>
+                        </div>
+
+                        {/* Progress Section */}
+                        <div className="mb-6 bg-gray-50 dark:bg-slate-900/50 p-4 rounded-xl">
+                            <div className="flex justify-between text-sm text-gray-600 dark:text-gray-300 mb-2 font-bold">
+                                <span>{daysLeft} {t('daysRemaining')}</span>
+                                <span className="text-gray-400 dark:text-gray-500">{t('days')}</span>
                             </div>
-                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5 overflow-hidden">
                                 <div 
-                                    className={`h-full rounded-full ${isPaused ? 'bg-amber-400' : daysLeft < 5 ? 'bg-red-500' : 'bg-green-500'}`} 
-                                    style={{ width: `${Math.min((daysLeft / sub.duration_days) * 100, 100)}%` }}
+                                    className={`h-full rounded-full transition-all duration-500 ${status === 'Active' ? 'bg-emerald-500' : 'bg-gray-400 dark:bg-gray-600'}`} 
+                                    style={{ width: `${progress}%` }}
                                 ></div>
                             </div>
-                            <div className="flex justify-between text-xs text-gray-400 mt-2">
-                                <span>Start: {sub.start_date}</span>
-                                <span>Total: {sub.price} EGP</span>
+                            <div className="flex justify-between mt-3 text-xs text-gray-500 dark:text-gray-400 font-semibold">
+                                <span>Start: {sub ? sub.start_date : '-'}</span>
+                                <span className="text-primary-600 dark:text-primary-400">{sub?.price || 0} EGP</span>
                             </div>
                         </div>
-                    ) : (
-                        <div className="mb-6 p-4 bg-gray-50 dark:bg-slate-800/50 rounded-2xl text-center text-sm text-gray-500 italic">
-                            No active subscription
-                        </div>
-                    )}
 
-                    <div className="flex gap-2">
-                        <button 
-                            onClick={() => openModal(user, sub)}
-                            className="flex-1 bg-primary-500 hover:bg-primary-600 text-white py-2 rounded-xl font-bold text-sm flex items-center justify-center gap-2"
-                        >
-                            {sub ? <Edit2 size={16}/> : <Plus size={16}/>}
-                            {sub ? t('renew') : t('addSubscription')}
-                        </button>
-                        {sub && (
-                            <>
+                        {/* Actions Footer */}
+                        <div className="flex items-center gap-2 mt-auto">
+                             {sub && (
+                                <>
+                                    <button 
+                                        onClick={() => handleDeleteClick(sub.id)}
+                                        className="w-10 h-10 rounded-xl bg-red-50 text-red-500 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40 flex items-center justify-center transition-colors"
+                                        title="Delete"
+                                    >
+                                        <Trash2 size={18} />
+                                    </button>
+                                    <button 
+                                        onClick={() => generateSubscriptionReceipt(user, sub, language, t)}
+                                        className="w-10 h-10 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-slate-700 dark:text-gray-300 dark:hover:bg-slate-600 flex items-center justify-center transition-colors"
+                                        title="Receipt"
+                                    >
+                                        <Download size={18} />
+                                    </button>
+                                    <button 
+                                        onClick={() => togglePause(user)}
+                                        className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-900/20 dark:text-amber-400 dark:hover:bg-amber-900/40 flex items-center justify-center transition-colors"
+                                        title={sub.status === 'paused' ? 'Resume' : 'Pause'}
+                                    >
+                                        {sub.status === 'paused' ? <PlayCircle size={18} /> : <PauseCircle size={18} />}
+                                    </button>
+                                </>
+                             )}
                              <button 
-                                onClick={() => togglePause(sub)}
-                                className={`p-2 rounded-xl transition-colors ${sub.status === 'paused' ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-amber-50 text-amber-600 hover:bg-amber-100'}`}
-                                title={sub.status === 'paused' ? t('resumeSubscription') : t('pauseSubscription')}
+                                onClick={() => openEditModal(user)}
+                                className="flex-1 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-700 text-white font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-primary-600/20"
+                             >
+                                <Edit2 size={16} />
+                                {t(sub ? 'update' : 'addSubscription')}
+                             </button>
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+
+        {/* Delete Confirmation Modal */}
+        {deleteId && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                <div className="bg-white dark:bg-slate-900 w-full max-w-sm p-6 rounded-3xl shadow-2xl border border-gray-100 dark:border-slate-800 animate-in fade-in zoom-in duration-200">
+                    <div className="flex flex-col items-center text-center">
+                        <div className="p-4 bg-red-100 dark:bg-red-900/20 text-red-600 rounded-full mb-4">
+                            <AlertTriangle size={32} />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">{language === 'ar' ? 'حذف الاشتراك؟' : 'Delete Subscription?'}</h3>
+                        <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">
+                            {language === 'ar' 
+                                ? 'هل أنت متأكد من رغبتك في حذف هذا الاشتراك؟ لا يمكن التراجع عن هذا الإجراء.' 
+                                : 'Are you sure you want to remove this subscription? This action cannot be undone.'}
+                        </p>
+                        <div className="flex gap-3 w-full">
+                            <button 
+                                onClick={() => setDeleteId(null)} 
+                                disabled={isDeleting}
+                                className="flex-1 p-3 rounded-xl border border-gray-200 dark:border-slate-700 font-bold hover:bg-gray-50 dark:hover:bg-slate-800 text-gray-700 dark:text-gray-300 transition-colors"
                             >
-                                {sub.status === 'paused' ? <PlayCircle size={18}/> : <PauseCircle size={18}/>}
+                                {t('cancel')}
                             </button>
                             <button 
-                                onClick={() => generateSubscriptionReceipt(user, sub, language, t)}
-                                className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100"
-                                title={t('printReceipt')}
+                                onClick={confirmDelete}
+                                disabled={isDeleting}
+                                className="flex-1 p-3 rounded-xl bg-red-500 text-white font-bold hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
                             >
-                                <Download size={18}/>
+                                {isDeleting ? <Loader2 className="animate-spin" size={18} /> : <Trash2 size={18} />}
+                                {t('delete')}
                             </button>
-                             <button 
-                                onClick={() => setSubToDelete(sub)}
-                                className="p-2 bg-red-50 text-red-600 rounded-xl hover:bg-red-100"
-                                title={t('deleteSubscription')}
-                            >
-                                <Trash2 size={18}/>
-                            </button>
-                            </>
-                        )}
+                        </div>
                     </div>
                 </div>
-              );
-          })}
-       </div>
+            </div>
+        )}
 
-       {/* Add/Edit Subscription Modal */}
-       {selectedUser && (
-           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-               <div className="glass bg-white dark:bg-slate-900 w-full max-w-md p-8 rounded-3xl animate-in zoom-in">
-                   <h3 className="text-2xl font-bold mb-4 dark:text-white">
-                       {editingSubId ? t('editSubscription') : t('addSubscription')}
-                   </h3>
-                   <p className="mb-6 text-gray-500">for <span className="font-bold text-primary-500">{selectedUser.full_name}</span></p>
-                   
-                   <form onSubmit={handleSubmit} className="space-y-4">
-                       <div>
-                           <label className="block text-sm font-bold mb-1 dark:text-gray-300">{t('startDate')}</label>
-                           <input 
-                              type="date" 
-                              required 
-                              value={startDate} 
-                              onChange={e => setStartDate(e.target.value)} 
-                              className="w-full p-3 rounded-xl border bg-white text-gray-900 border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
-                            />
-                       </div>
-                       <div className="grid grid-cols-2 gap-4">
-                           <div>
-                               <label className="block text-sm font-bold mb-1 dark:text-gray-300">{t('durationDays')}</label>
-                               <input 
-                                  type="number" 
-                                  required 
-                                  value={duration} 
-                                  onChange={e => setDuration(Number(e.target.value))} 
-                                  className="w-full p-3 rounded-xl border bg-white text-gray-900 border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+        {/* Edit/Renew Modal */}
+        {isModalOpen && selectedUser && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-[28px] p-8 border border-gray-100 dark:border-slate-800 shadow-2xl relative animate-in fade-in zoom-in duration-200">
+                    <h3 className="text-3xl font-black text-gray-800 dark:text-white text-right mb-1">{language === 'ar' ? 'تعديل الاشتراك' : 'Edit Subscription'}</h3>
+                    <p className="text-gray-500 text-right mb-8 text-sm font-medium">for <span className="text-primary-600 dark:text-primary-400 font-bold">{selectedUser.full_name}</span></p>
+
+                    <form onSubmit={handleSave} className="space-y-6">
+                        
+                        <div className="space-y-2">
+                            <label className="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase block text-right tracking-wider">{t('startDate')}</label>
+                            <div className="relative">
+                                <input 
+                                    type="date" 
+                                    required
+                                    className="w-full p-4 rounded-xl bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-white font-bold outline-none border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 text-right pr-4"
+                                    value={formData.startDate}
+                                    onChange={e => setFormData({...formData, startDate: e.target.value})}
                                 />
-                           </div>
-                           <div>
-                               <label className="block text-sm font-bold mb-1 dark:text-gray-300">{t('price')}</label>
-                               <input 
-                                  type="number" 
-                                  required 
-                                  value={price} 
-                                  onChange={e => setPrice(Number(e.target.value))} 
-                                  className="w-full p-3 rounded-xl border bg-white text-gray-900 border-gray-300 focus:ring-2 focus:ring-primary-500 focus:border-transparent outline-none"
+                                <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                            </div>
+                        </div>
+
+                        <div className="flex gap-4">
+                            <div className="flex-1 space-y-2">
+                                <label className="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase block text-right tracking-wider">{t('subscriptionPrice')}</label>
+                                <input 
+                                    type="number" 
+                                    className="w-full p-4 rounded-xl bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-white font-bold outline-none border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 text-center"
+                                    value={formData.price}
+                                    onChange={e => setFormData({...formData, price: Number(e.target.value)})}
                                 />
-                           </div>
-                       </div>
-                       
-                       {/* End Date Display */}
-                       <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl text-blue-700 dark:text-blue-300 flex justify-between items-center">
-                           <span className="font-medium">Ends On:</span>
-                           <span className="font-bold text-lg">{endDateDisplay}</span>
-                       </div>
+                            </div>
+                            <div className="flex-1 space-y-2">
+                                <label className="text-gray-500 dark:text-gray-400 text-xs font-bold uppercase block text-right tracking-wider">{t('durationDays')}</label>
+                                <input 
+                                    type="number" 
+                                    className="w-full p-4 rounded-xl bg-gray-50 dark:bg-slate-800 text-gray-900 dark:text-white font-bold outline-none border border-gray-200 dark:border-gray-700 focus:ring-2 focus:ring-primary-500 text-center"
+                                    value={formData.duration}
+                                    onChange={e => setFormData({...formData, duration: Number(e.target.value)})}
+                                />
+                            </div>
+                        </div>
 
-                       <div className="flex gap-3 mt-6">
-                           <button type="button" onClick={() => setSelectedUser(null)} className="flex-1 p-3 rounded-xl bg-gray-100 dark:bg-slate-800 font-bold">{t('cancel')}</button>
-                           <button type="submit" className="flex-1 p-3 rounded-xl bg-primary-500 text-white font-bold">{t('save')}</button>
-                       </div>
-                   </form>
-               </div>
-           </div>
-       )}
+                        <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl flex justify-between items-center text-blue-700 dark:text-blue-300 font-bold border border-blue-100 dark:border-blue-900/50">
+                            <span>{getEndDate()}</span>
+                            <span className="text-blue-400 dark:text-blue-500/70 text-sm uppercase tracking-widest">Ends On</span>
+                        </div>
 
-       {/* Delete Confirmation Modal */}
-       {subToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="glass bg-white dark:bg-slate-900 w-full max-w-md p-8 rounded-3xl shadow-2xl animate-in fade-in zoom-in duration-200 border border-red-100 dark:border-red-900/30">
-            
-            <div className="flex flex-col items-center text-center">
-                <div className="p-4 bg-red-100 dark:bg-red-900/20 text-red-600 rounded-full mb-6 ring-8 ring-red-50 dark:ring-red-900/10">
-                    {isDeleting ? <Loader2 size={36} className="animate-spin" /> : <AlertTriangle size={36} strokeWidth={2.5} />}
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Delete Subscription?</h3>
-                <p className="text-gray-500 dark:text-gray-400 mb-8">
-                    This will remove the active subscription. <br/>
-                    The user will lose access to add new data immediately.
-                </p>
+                        <div className="flex gap-4 pt-4">
+                             <button 
+                                type="button"
+                                onClick={() => setIsModalOpen(false)}
+                                className="flex-1 py-4 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 font-bold hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors"
+                             >
+                                {t('cancel')}
+                             </button>
+                             <button 
+                                type="submit"
+                                disabled={isLoading}
+                                className="flex-1 py-4 rounded-xl bg-primary-600 text-white font-bold hover:bg-primary-700 transition-colors flex justify-center items-center gap-2 shadow-lg shadow-primary-600/30"
+                             >
+                                {isLoading ? <Loader2 className="animate-spin" /> : t('save')}
+                             </button>
+                        </div>
 
-                <div className="flex gap-3 w-full">
-                    <button 
-                        type="button"
-                        onClick={() => setSubToDelete(null)}
-                        disabled={isDeleting}
-                        className="flex-1 p-3.5 rounded-xl border border-gray-200 dark:border-gray-700 font-bold hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors text-gray-700 dark:text-gray-300 disabled:opacity-50"
-                    >
-                        {t('cancel')}
-                    </button>
-                    <button 
-                        type="button"
-                        onClick={confirmDelete}
-                        disabled={isDeleting}
-                        className="flex-1 p-3.5 rounded-xl bg-red-500 hover:bg-red-600 text-white font-bold shadow-lg shadow-red-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                    >
-                        {isDeleting ? 'Deleting...' : (
-                            <>
-                                <Trash2 size={18} />
-                                Delete
-                            </>
-                        )}
-                    </button>
+                    </form>
                 </div>
             </div>
-          </div>
-        </div>
-      )}
+        )}
     </div>
   );
 };
