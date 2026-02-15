@@ -79,6 +79,16 @@ export interface User {
   subscription?: Subscription;
 }
 
+export interface SessionLog {
+    id: string;
+    user_id: string;
+    device_id?: string; // New: Unique ID per browser
+    user_agent: string;
+    ip_address?: string;
+    login_at: string;
+    last_active_at: string;
+}
+
 export type Language = 'en' | 'ar';
 export type Theme = 'light' | 'dark';
 

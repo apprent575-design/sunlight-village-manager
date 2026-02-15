@@ -1,8 +1,9 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { AppState, Language, Theme, Unit, Booking, Expense, User, Subscription } from '../types';
+import { AppState, Language, Theme, Unit, Booking, Expense, User, Subscription, SessionLog } from '../types';
 import { TRANSLATIONS } from '../constants';
-import { addDays, isAfter, differenceInDays, format, isValid } from 'date-fns';
+import { addDays, isAfter, differenceInDays, format, isValid, subHours } from 'date-fns';
 import { arSA, enUS } from 'date-fns/locale';
 
 // --- CONFIGURATION ---
@@ -54,6 +55,9 @@ interface AppContextType {
   updateSubscription: (subscription: Subscription) => Promise<void>;
   deleteSubscription: (id: string) => Promise<void>;
   
+  // Admin Analytics
+  fetchUserSessions: (userId: string) => Promise<SessionLog[]>;
+
   // Helpers
   t: (key: keyof typeof TRANSLATIONS.en) => string;
   isRTL: boolean;
@@ -120,6 +124,10 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   const userRef = useRef(user);
   const allUsersRef = useRef(allUsers);
   const isMounted = useRef(true);
+  
+  // Session tracking ref
+  const currentSessionId = useRef<string | null>(null);
+  const sessionInterval = useRef<any>(null);
 
   useEffect(() => { userRef.current = user; }, [user]);
   useEffect(() => { allUsersRef.current = allUsers; }, [allUsers]);
@@ -157,6 +165,130 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     localStorage.setItem('language', language);
   }, [language]);
 
+  // --- SESSION TRACKING LOGIC ---
+  
+  // Helper to fetch Public IP with Fallback
+  const getPublicIP = async (): Promise<string> => {
+      const controller = new AbortController();
+      const id = setTimeout(() => controller.abort(), 3000); // 3s Timeout
+
+      try {
+          // Primary: Ipify
+          const response = await fetch('https://api.ipify.org?format=json', { signal: controller.signal });
+          if (response.ok) {
+              const data = await response.json();
+              clearTimeout(id);
+              return data.ip;
+          }
+          throw new Error('Ipify failed');
+      } catch (e) {
+          try {
+              // Fallback: ip-api
+              const response = await fetch('http://ip-api.com/json', { signal: controller.signal });
+              if (response.ok) {
+                  const data = await response.json();
+                  clearTimeout(id);
+                  return data.query; // ip-api uses 'query' field for IP
+              }
+          } catch (err) {
+              clearTimeout(id);
+              return 'Unknown';
+          }
+          clearTimeout(id);
+          return 'Unknown';
+      }
+  };
+
+  // Helper to get persistent Device ID
+  const getDeviceId = (): string => {
+      let deviceId = localStorage.getItem('sunlight_device_id');
+      if (!deviceId) {
+          deviceId = crypto.randomUUID();
+          localStorage.setItem('sunlight_device_id', deviceId);
+      }
+      return deviceId;
+  };
+
+  const trackSession = async (userId: string) => {
+    if (!supabase) return;
+
+    try {
+        const deviceId = getDeviceId();
+        // Fire and forget IP fetch to not block UI, but wait slightly
+        const ip = await getPublicIP();
+
+        // 1. Check if there is an active session for this device in the last 24 hours
+        const cutoffTime = subHours(new Date(), 24).toISOString();
+        
+        const { data: existingSession } = await supabase
+            .from('session_logs')
+            .select('id')
+            .eq('user_id', userId)
+            .eq('device_id', deviceId)
+            .gt('last_active_at', cutoffTime)
+            .order('last_active_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+        if (existingSession) {
+            // Update existing session
+            currentSessionId.current = existingSession.id;
+            await supabase
+                .from('session_logs')
+                .update({ 
+                    last_active_at: new Date().toISOString(),
+                    ip_address: ip // Update IP in case network changed
+                })
+                .eq('id', existingSession.id);
+        } else {
+            // Create new session
+            const { data } = await supabase.from('session_logs').insert([{
+                user_id: userId,
+                device_id: deviceId,
+                user_agent: navigator.userAgent,
+                ip_address: ip,
+                login_at: new Date().toISOString(),
+                last_active_at: new Date().toISOString()
+            }]).select('id').single();
+
+            if (data) {
+                currentSessionId.current = data.id;
+            }
+        }
+
+        // 2. Start Heartbeat (Update every 1 minute)
+        if (sessionInterval.current) clearInterval(sessionInterval.current);
+        
+        sessionInterval.current = setInterval(async () => {
+            if (currentSessionId.current && document.visibilityState === 'visible') {
+                await supabase!.from('session_logs')
+                    .update({ last_active_at: new Date().toISOString() })
+                    .eq('id', currentSessionId.current);
+            }
+        }, 60000); 
+
+    } catch (e) {
+        console.error("Session tracking error", e);
+    }
+  };
+
+  const endSessionTracking = () => {
+      if (sessionInterval.current) clearInterval(sessionInterval.current);
+      currentSessionId.current = null;
+  };
+
+  useEffect(() => {
+      if (user) {
+          trackSession(user.id);
+      } else {
+          endSessionTracking();
+      }
+      return () => {
+          if (sessionInterval.current) clearInterval(sessionInterval.current);
+      };
+  }, [user?.id]);
+
+
   // --- REALTIME SUBSCRIPTIONS ---
   useEffect(() => {
     if (!supabase) return;
@@ -168,40 +300,27 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
             (payload) => {
                 const { eventType, new: newRecord, old: oldRecord } = payload;
                 const currentUser = userRef.current;
-                const currentAllUsers = allUsersRef.current;
                 
-                // 1. Identify Target User ID
-                let targetUserId = newRecord?.user_id;
+                // Identify Target User ID
+                let targetUserId = newRecord?.user_id || oldRecord?.user_id;
                 
-                // Handle DELETE: oldRecord usually only has the ID
-                if (eventType === 'DELETE' && !targetUserId) {
-                    // Check if it belongs to current user
-                    if (currentUser?.subscription?.id === oldRecord.id) {
-                        targetUserId = currentUser.id;
-                    } 
-                    // Check admin list
-                    else {
-                        const found = currentAllUsers.find(u => u.subscription?.id === oldRecord.id);
-                        if (found) targetUserId = found.id;
-                    }
+                // Special handle for delete where oldRecord might only have ID
+                if (eventType === 'DELETE' && !targetUserId && currentUser?.subscription?.id === oldRecord.id) {
+                    targetUserId = currentUser.id;
                 }
 
                 if (!targetUserId) return;
 
-                // 2. Update Current User State (Immediate Feedback for the user being updated)
-                // This updates the UI for the specific user instantly without refresh
+                // Update Current User
                 if (currentUser && currentUser.id === targetUserId) {
                     setUser(prev => {
                         if (!prev) return null;
-                        if (eventType === 'DELETE') {
-                            return { ...prev, subscription: undefined };
-                        }
+                        if (eventType === 'DELETE') return { ...prev, subscription: undefined };
                         return { ...prev, subscription: newRecord as Subscription };
                     });
                 }
 
-                // 3. Update Admin List (Immediate Feedback for Admin)
-                // Ensures Admin dashboard reflects changes from other admins or systems
+                // Update Admin List
                 setAllUsers(prev => prev.map(u => {
                     if (u.id === targetUserId) {
                          if (eventType === 'DELETE') return { ...u, subscription: undefined };
@@ -216,7 +335,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
     return () => {
         supabase.removeChannel(channel);
     };
-  }, []); // Run once on mount. Refs handle state updates.
+  }, []);
 
   // --- INITIALIZATION LOGIC ---
   useEffect(() => {
@@ -251,7 +370,6 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       if (!isMounted.current) return;
 
       if (event === 'SIGNED_IN' && session?.user) {
-         // Only refresh data if the user actually changed
          setUser(prev => {
              if (prev?.id !== session.user.id) {
                  setIsLoading(true);
@@ -265,7 +383,6 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
              return prev; 
          });
       } else if (event === 'SIGNED_OUT') {
-         // Cleanup is handled in logout() mainly, but this catches other signouts
          setUser(null);
          setUnits([]);
          setBookings([]);
@@ -386,22 +503,17 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   };
 
   const logout = async () => {
-    // 1. Clear Local State Immediately (UI updates instantly)
     setUser(null);
     setUnits([]);
     setBookings([]);
     setExpenses([]);
     setAllUsers([]);
-    
-    // 2. Clear Persistence (Using the project reference ID from your supabase URL)
+    endSessionTracking();
     localStorage.removeItem('sb-nvnykdzmshpwcevipkdl-auth-token');
     
-    // 3. Attempt Server SignOut (Best Effort)
     try {
         if (supabase) await (supabase as any).auth.signOut();
     } catch (e) {
-        // Expected if token is already invalid/expired (403)
-        // We ignore this because we already cleared the local session.
         console.log("Server logout failed (harmless):", e);
     } finally {
         setIsLoading(false);
@@ -417,26 +529,47 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   const addAccount = async (email: string, password: string, fullName: string) => { if (!supabase) return; };
   const deleteAccount = async (id: string) => {
       if (!supabase) return;
-      setAllUsers(prev => prev.filter(u => u.id !== id)); // Optimistic
+      setAllUsers(prev => prev.filter(u => u.id !== id)); 
       await supabase.from('profiles').delete().eq('id', id);
+  };
+
+  // IMPORTANT: Enhanced session fetching using RPC to bypass RLS issues
+  const fetchUserSessions = async (userId: string): Promise<SessionLog[]> => {
+      if (!supabase) return [];
+      
+      // 1. Try RPC First (Guarantees Access if enabled in SQL)
+      const { data: rpcData, error: rpcError } = await supabase
+        .rpc('get_user_sessions', { target_user_id: userId });
+
+      if (!rpcError && rpcData) {
+          return rpcData as SessionLog[];
+      }
+
+      // 2. Fallback to Standard Select (If RPC fails/not exists)
+      const { data, error } = await supabase
+        .from('session_logs')
+        .select('id, user_id, user_agent, ip_address, login_at, last_active_at, device_id')
+        .eq('user_id', userId)
+        .order('last_active_at', { ascending: false })
+        .limit(50);
+      
+      if (error) {
+          console.error("Fetch sessions failed:", error);
+          return [];
+      }
+      return data as SessionLog[];
   };
 
   // --- Subscription Management ---
   const addSubscription = async (subscription: Subscription) => {
-      // Optimistic Update for Admin List
       setAllUsers(prev => prev.map(u => u.id === subscription.user_id ? { ...u, subscription } : u));
-      
-      // Update Current User if it's me
-      if (user && user.id === subscription.user_id) {
-          setUser({ ...user, subscription });
-      }
+      if (user && user.id === subscription.user_id) setUser({ ...user, subscription });
 
       if (!supabase) return;
-
-      const { data, error } = await supabase.from('subscriptions').upsert(subscription).select().single();
+      const { error } = await supabase.from('subscriptions').upsert(subscription).select().single();
       if (error) {
           console.error("Sub Error:", error);
-          if (user) fetchData(user); // Revert on error
+          if (user) fetchData(user);
           throw new Error(error.message);
       }
   };
@@ -445,7 +578,6 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
 
   const deleteSubscription = async (id: string) => {
       const targetUser = allUsers.find(u => u.subscription?.id === id);
-      
       if (targetUser) {
           const updatedUser = { ...targetUser, subscription: undefined };
           setAllUsers(prev => prev.map(u => u.id === targetUser.id ? updatedUser : u));
@@ -463,42 +595,23 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   // --- Data CRUD ---
   const checkRestriction = () => {
       if (isAdmin) return;
-
-      // 1. Not Subscribed
-      if (!subExists) {
-          throw new Error(language === 'ar' 
-             ? 'عفواً، أنت غير مشترك في الخدمة. يرجى التواصل مع الإدارة.' 
-             : 'Access Denied. You do not have an active subscription.');
-      }
-
-      // 2. Paused
-      if (user?.subscription?.status === 'paused') {
-          throw new Error(language === 'ar' 
-             ? 'عفواً، اشتراكك موقوف مؤقتاً. يرجى تفعيل الاشتراك لإضافة بيانات جديدة.' 
-             : 'Your subscription is currently paused. Please resume it to add data.');
-      }
-
-      // 3. Expired
-      if (!hasValidSubscription) {
-          throw new Error(language === 'ar' 
-             ? 'عفواً، لقد انتهت صلاحية اشتراكك. يرجى التجديد للمتابعة.' 
-             : 'Your subscription has expired. Please renew to continue.');
-      }
+      if (!subExists) throw new Error(language === 'ar' ? 'غير مشترك.' : 'Access Denied.');
+      if (user?.subscription?.status === 'paused') throw new Error(language === 'ar' ? 'اشتراكك موقوف.' : 'Subscription paused.');
+      if (!hasValidSubscription) throw new Error(language === 'ar' ? 'انتهى الاشتراك.' : 'Subscription expired.');
   };
 
   const addBooking = async (booking: Booking) => {
     checkRestriction();
     if (!user) throw new Error("User not authenticated");
     booking.user_id = user.id; 
-    setBookings(prev => [booking, ...prev]); // Optimistic
-    
+    setBookings(prev => [booking, ...prev]); 
     if (!supabase) return;
     const { error } = await supabase.from('bookings').insert([booking]);
     if (error) { setBookings(prev => prev.filter(b => b.id !== booking.id)); throw error; }
   };
 
   const updateBooking = async (updated: Booking) => {
-    setBookings(prev => prev.map(b => b.id === updated.id ? updated : b)); // Optimistic
+    setBookings(prev => prev.map(b => b.id === updated.id ? updated : b));
     if (!supabase) return;
     const { error } = await supabase.from('bookings').update(updated).eq('id', updated.id);
     if (error) throw error;
@@ -506,7 +619,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
 
   const deleteBooking = async (id: string) => {
       const original = bookings.find(b => b.id === id);
-      setBookings(prev => prev.filter(b => b.id !== id)); // Optimistic
+      setBookings(prev => prev.filter(b => b.id !== id));
       if(!supabase) return;
       const { error } = await supabase.from('bookings').delete().eq('id', id);
       if(error && original) setBookings(prev => [...prev, original]);
@@ -568,6 +681,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       addExpense, updateExpense, deleteExpense,
       addUnit, updateUnit, deleteUnit,
       addAccount, deleteAccount, addSubscription, updateSubscription, deleteSubscription,
+      fetchUserSessions,
       t, isRTL: language === 'ar', isLoading, isAdmin,
       hasValidSubscription: isAdmin ? true : hasValidSubscription,
       daysRemaining
