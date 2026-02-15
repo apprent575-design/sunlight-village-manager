@@ -55,8 +55,9 @@ interface AppContextType {
   updateSubscription: (subscription: Subscription) => Promise<void>;
   deleteSubscription: (id: string) => Promise<void>;
   
-  // Admin Analytics
+  // Admin Analytics & Security
   fetchUserSessions: (userId: string) => Promise<SessionLog[]>;
+  deleteSessionLog: (sessionId: string) => Promise<void>;
 
   // Helpers
   t: (key: keyof typeof TRANSLATIONS.en) => string;
@@ -256,16 +257,31 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
             }
         }
 
-        // 2. Start Heartbeat (Update every 1 minute)
+        // 2. Start Heartbeat (Check every 5 seconds)
+        // CRITICAL: This is the fallback mechanism. If Realtime fails, this will catch the deletion.
         if (sessionInterval.current) clearInterval(sessionInterval.current);
         
         sessionInterval.current = setInterval(async () => {
-            if (currentSessionId.current && document.visibilityState === 'visible') {
-                await supabase!.from('session_logs')
+            // Only proceed if we have a session ID
+            if (currentSessionId.current) {
+                // Try to update the session. 
+                // We use .select() to get the return data.
+                // If the row was deleted, .maybeSingle() will return null because no row matched the ID.
+                const { data, error } = await supabase!
+                    .from('session_logs')
                     .update({ last_active_at: new Date().toISOString() })
-                    .eq('id', currentSessionId.current);
+                    .eq('id', currentSessionId.current)
+                    .select('id')
+                    .maybeSingle();
+
+                // If Data is NULL, it means the session row does not exist anymore (Deleted by Admin)
+                if (!data || error) {
+                    console.warn("Session heartbeat failed - Session deleted remotely.");
+                    await logout();
+                    window.location.replace('/'); // Force reload to clear state
+                }
             }
-        }, 60000); 
+        }, 5000); // Check every 5 seconds for faster response
 
     } catch (e) {
         console.error("Session tracking error", e);
@@ -289,11 +305,12 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   }, [user?.id]);
 
 
-  // --- REALTIME SUBSCRIPTIONS ---
+  // --- REALTIME SUBSCRIPTIONS (Data Sync + Force Logout) ---
   useEffect(() => {
     if (!supabase) return;
 
     const channel = supabase.channel('app-db-changes')
+        // 1. Subscription Updates
         .on(
             'postgres_changes',
             { event: '*', schema: 'public', table: 'subscriptions' },
@@ -328,6 +345,20 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
                     }
                     return u;
                 }));
+            }
+        )
+        // 2. FORCE LOGOUT LISTENER (Session Deletion)
+        .on(
+            'postgres_changes',
+            { event: 'DELETE', schema: 'public', table: 'session_logs' },
+            async (payload) => {
+                // Check if the deleted session ID matches CURRENT browser session ID
+                // Note: old record usually contains the primary key (id)
+                if (currentSessionId.current && payload.old && payload.old.id === currentSessionId.current) {
+                    console.warn("Realtime: Session terminated by admin.");
+                    await logout();
+                    window.location.replace('/'); // Force reload
+                }
             }
         )
         .subscribe();
@@ -560,6 +591,12 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       return data as SessionLog[];
   };
 
+  // Delete a specific session log (Force Logout)
+  const deleteSessionLog = async (sessionId: string) => {
+      if (!supabase) return;
+      await supabase.from('session_logs').delete().eq('id', sessionId);
+  };
+
   // --- Subscription Management ---
   const addSubscription = async (subscription: Subscription) => {
       setAllUsers(prev => prev.map(u => u.id === subscription.user_id ? { ...u, subscription } : u));
@@ -681,7 +718,7 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
       addExpense, updateExpense, deleteExpense,
       addUnit, updateUnit, deleteUnit,
       addAccount, deleteAccount, addSubscription, updateSubscription, deleteSubscription,
-      fetchUserSessions,
+      fetchUserSessions, deleteSessionLog,
       t, isRTL: language === 'ar', isLoading, isAdmin,
       hasValidSubscription: isAdmin ? true : hasValidSubscription,
       daysRemaining

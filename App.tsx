@@ -15,6 +15,7 @@ import { Auth } from './components/Auth';
 import { AdminAccounts } from './components/AdminAccounts';
 import { AdminSubscriptions } from './components/AdminSubscriptions';
 import { AdminReports } from './components/AdminReports';
+import { AdminNotifications } from './components/AdminNotifications';
 import { Loader2 } from 'lucide-react';
 
 const AppContent = () => {
@@ -44,8 +45,9 @@ const AppContent = () => {
             {/* Admin Routes */}
             {isAdmin ? (
                <>
-                 <Route path="/admin/dashboard" element={<Dashboard />} /> {/* Reuse Dashboard for overview for now */}
+                 <Route path="/admin/dashboard" element={<Dashboard />} />
                  <Route path="/admin/accounts" element={<AdminAccounts />} />
+                 <Route path="/admin/notifications" element={<AdminNotifications />} />
                  <Route path="/admin/subscriptions" element={<AdminSubscriptions />} />
                  <Route path="/admin/reports" element={<AdminReports />} />
                  <Route path="*" element={<Navigate to="/admin/subscriptions" replace />} />

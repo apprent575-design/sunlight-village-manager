@@ -18,7 +18,8 @@ import {
   Users,
   CreditCard,
   FileText,
-  HelpCircle
+  HelpCircle,
+  Bell
 } from 'lucide-react';
 
 export const Layout = ({ children }: { children?: React.ReactNode }) => {
@@ -40,6 +41,7 @@ export const Layout = ({ children }: { children?: React.ReactNode }) => {
 
   const adminNavItems = [
     { path: '/admin/dashboard', icon: LayoutDashboard, label: t('adminDashboard') },
+    { path: '/admin/notifications', icon: Bell, label: t('notifications') },
     { path: '/admin/accounts', icon: Users, label: t('accounts') },
     { path: '/admin/subscriptions', icon: CreditCard, label: t('subscriptions') },
     { path: '/admin/reports', icon: FileText, label: t('reports') },
